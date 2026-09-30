@@ -3,6 +3,7 @@ import Link from "next/link";
 const LINKS = [
   { href: "/emails", label: "Emails" },
   { href: "/deals", label: "Deals" },
+  { href: "/integrations/gmail", label: "Gmail" },
   { href: "/", label: "Status" },
 ];
 
