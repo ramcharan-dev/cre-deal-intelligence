@@ -11,7 +11,7 @@ import {
   type EmailCategory,
   type GmailMessage,
   type ProcessingStatus,
-} from "@/lib/gmail-mock";
+} from "@/lib/gmail";
 import { cn } from "@/lib/utils";
 
 const STATUS: Record<ProcessingStatus, { label: string; dot: string }> = {
@@ -44,7 +44,7 @@ export function StatusBadge({ status }: { status: ProcessingStatus }) {
 export function RelevanceMeter({ score }: { score: number }) {
   const level = relevanceLevel(score);
   return (
-    <div className="flex items-center gap-2" title={`Relevance ${score}/100`}>
+    <div className="flex items-center gap-2" title={`Keyword relevance ${score}/100 (${level})`}>
       <div className="bg-muted h-1.5 w-12 overflow-hidden rounded-full" aria-hidden>
         <div
           className={cn("h-full rounded-full", level === "Low" ? "bg-muted-foreground/40" : "bg-foreground")}
@@ -92,8 +92,8 @@ export function EmailTable({
             onClick={() => onSelect(m.id)}
           >
             <TableCell className={cn("max-w-40", compact ? "hidden" : "hidden md:table-cell")}>
-              <div className="truncate font-medium">{m.senderName}</div>
-              <div className="text-muted-foreground truncate text-xs">{m.senderEmail}</div>
+              <div className="truncate font-medium">{m.sender_name ?? m.sender_email ?? "—"}</div>
+              {m.sender_name && <div className="text-muted-foreground truncate text-xs">{m.sender_email}</div>}
             </TableCell>
             <TableCell className="max-w-72 min-w-56 whitespace-normal">
               <button
@@ -105,21 +105,21 @@ export function EmailTable({
                 aria-current={m.id === selectedId ? "true" : undefined}
                 className="focus-visible:ring-ring/50 line-clamp-2 rounded-sm text-left font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3"
               >
-                {m.subject}
+                {m.subject || "(no subject)"}
               </button>
               <div className={cn("text-muted-foreground flex items-center gap-1 text-xs", !compact && "md:hidden")}>
-                <span className="truncate">{m.senderName}</span>
-                {m.attachments.length > 0 && <Paperclip className="size-3 shrink-0" aria-label="Has attachments" />}
+                <span className="truncate">{m.sender_name ?? m.sender_email}</span>
+                {m.attachment_names.length > 0 && <Paperclip className="size-3 shrink-0" aria-label="Has attachments" />}
               </div>
-              {!compact && m.attachments.length > 0 && (
+              {!compact && m.attachment_names.length > 0 && (
                 <div className="text-muted-foreground hidden items-center gap-1 text-xs md:flex">
                   <Paperclip className="size-3" aria-hidden />
-                  {m.attachments.length} attachment{m.attachments.length > 1 ? "s" : ""}
+                  {m.attachment_names.length} attachment{m.attachment_names.length > 1 ? "s" : ""}
                 </div>
               )}
             </TableCell>
             <TableCell className="text-muted-foreground">
-              {formatDate(m.sentAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              {formatDate(m.sent_at, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             </TableCell>
             <TableCell>
               <CategoryBadge category={m.category} />

@@ -1,9 +1,10 @@
-"""Response models shared by the email and deal routes."""
+"""Request/response models for the email, deal and Gmail routes."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.extraction.matching import MatchMethod
 from app.extraction.schemas import EmailType, ValidationIssue
@@ -144,3 +145,106 @@ class DealDetail(BaseModel):
     fields: list[SourcedValue]
     quotes: list[QuoteDetail]
     emails: list[DealEmail]
+
+
+# ---------- gmail ----------
+
+GmailCategoryOut = Literal["lender_quote", "deal_update", "financing", "term_sheet", "follow_up", "other"]
+
+
+class GmailLastSync(BaseModel):
+    at: datetime
+    scanned: int = Field(description="Message ids returned by Gmail for the sync window")
+    new: int = Field(description="Messages fetched for the first time (the rest were already stored)")
+
+
+class GmailConnection(BaseModel):
+    configured: bool = Field(
+        description="False until GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and TOKEN_ENCRYPTION_KEY are set"
+    )
+    connected: bool
+    status: Literal["not_connected", "connected", "reauth_required"] = Field(
+        description="`reauth_required` when Google rejected the stored refresh token; reconnect to fix"
+    )
+    email_address: str | None = Field(None, examples=["priya.raman@harborviewcap.com"])
+    scopes: list[str] = Field(default_factory=list, description="OAuth scopes granted by the user")
+    connected_at: datetime | None = None
+    last_sync: GmailLastSync | None = None
+
+
+class GmailDisconnectResult(BaseModel):
+    disconnected: bool = Field(description="False when no mailbox was connected")
+    revoked: bool = Field(description="Whether Google confirmed the token revocation (best effort)")
+
+
+class GmailStatsOut(BaseModel):
+    scanned: int = Field(description="Messages scanned across all syncs")
+    relevant: int = Field(description="Messages at or above the CRE relevance threshold")
+    processed: int = Field(description="Messages processed by the email intelligence pipeline")
+    deals_updated: int = Field(description="Distinct deals created or updated from processed messages")
+
+
+class GmailSyncRequest(BaseModel):
+    after: date | None = Field(
+        None, description="First day to include (inclusive). Defaults to 30 days ago when both are omitted."
+    )
+    before: date | None = Field(None, description="Last day to include (inclusive)")
+    max_messages: int = Field(100, ge=1, le=500, description="Newest messages to scan in the window")
+
+    @model_validator(mode="after")
+    def _check_range(self) -> "GmailSyncRequest":
+        if self.after and self.before and self.after > self.before:
+            raise ValueError("`after` must be on or before `before`")
+        return self
+
+
+class GmailSyncResult(BaseModel):
+    scanned: int = Field(description="Message ids returned by Gmail for the window")
+    new: int = Field(description="Messages fetched and stored for the first time")
+    duplicates: int = Field(description="Messages skipped because their Gmail id was already stored")
+    relevant_new: int = Field(description="New messages normalized into `emails` for processing")
+    synced_at: datetime
+    stats: GmailStatsOut
+
+
+class GmailMessageOut(BaseModel):
+    id: uuid.UUID
+    gmail_id: str = Field(description="Gmail message id (unique per mailbox; used for duplicate protection)")
+    thread_id: str | None
+    subject: str
+    sender_name: str | None
+    sender_email: str | None
+    sent_at: datetime | None
+    snippet: str = Field(description="Gmail's plain-text preview")
+    category: GmailCategoryOut = Field(description="Keyword-based CRE category assigned at sync")
+    relevance: int = Field(ge=0, le=100, description="Keyword-based CRE relevance score assigned at sync")
+    status: Literal["pending", "processed", "failed", "skipped"] = Field(
+        description="`skipped`: below the relevance threshold (can still be processed); otherwise the status "
+        "of the linked email record"
+    )
+    error: str | None = Field(description="Processing failure, prefixed with the error code")
+    attachment_names: list[str]
+    email_id: uuid.UUID | None = Field(description="Linked `emails` record (null when skipped)")
+    email_type: str | None = Field(description="Set by Claude once processed")
+    deal_id: uuid.UUID | None
+    deal_name: str | None
+
+
+class GmailMessageDetail(GmailMessageOut):
+    to: list[str]
+    cc: list[str]
+    body_text: str | None = Field(
+        description="Plain-text body; null for skipped messages, which are not stored in full"
+    )
+    gmail_url: str = Field(description="Opens the message in Gmail")
+
+
+class GmailMessageList(BaseModel):
+    messages: list[GmailMessageOut]
+    stats: GmailStatsOut
+    last_sync: GmailLastSync | None
+
+
+class GmailProcessResult(BaseModel):
+    message: GmailMessageOut = Field(description="The message with its updated status")
+    result: EmailProcessingResult = Field(description="Output of the email intelligence pipeline")

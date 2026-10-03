@@ -161,3 +161,57 @@ class ExtractedValue(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     source_email: Mapped[Email] = relationship()
+
+
+class GmailAccount(TimestampMixin, Base):
+    """The connected Gmail mailbox. Only the encrypted refresh token is stored; access tokens never are."""
+
+    __tablename__ = "gmail_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    email_address: Mapped[str] = mapped_column(Text, unique=True)
+    refresh_token_encrypted: Mapped[str] = mapped_column(Text)  # Fernet ciphertext
+    scopes: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    status: Mapped[str] = mapped_column(String(20), default="connected")  # connected | reauth_required
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_sync_scanned: Mapped[int] = mapped_column(Integer, default=0)
+    last_sync_new: Mapped[int] = mapped_column(Integer, default=0)
+
+    messages: Mapped[list["GmailMessage"]] = relationship(
+        back_populates="account", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class GmailMessage(Base):
+    """One scanned Gmail message. `(account_id, gmail_id)` is unique, so a message is only ever fetched once.
+
+    Relevant messages are normalized into `emails` (status `received`) and linked via `email_id`; their
+    processing status is the linked email's status. Irrelevant messages keep metadata only (`email_id` null).
+    """
+
+    __tablename__ = "gmail_messages"
+    __table_args__ = (UniqueConstraint("account_id", "gmail_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gmail_accounts.id", ondelete="CASCADE"), index=True
+    )
+    gmail_id: Mapped[str] = mapped_column(String(64))
+    thread_id: Mapped[str | None] = mapped_column(String(64))
+    email_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("emails.id", ondelete="SET NULL"), index=True
+    )
+    subject: Mapped[str] = mapped_column(Text, default="")
+    sender_name: Mapped[str | None] = mapped_column(Text)
+    sender_email: Mapped[str | None] = mapped_column(Text)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    snippet: Mapped[str] = mapped_column(Text, default="")
+    label_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    attachment_names: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    category: Mapped[str] = mapped_column(String(20))
+    relevance: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    account: Mapped[GmailAccount] = relationship(back_populates="messages")
+    email: Mapped[Email | None] = relationship()

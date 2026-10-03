@@ -1,10 +1,10 @@
-import type { SyncStats as Stats } from "@/lib/gmail-mock";
+import type { GmailStats as Stats } from "@/lib/gmail";
 
 const ITEMS: { key: keyof Stats; label: string; hint: string }[] = [
-  { key: "scanned", label: "Emails scanned", hint: "In the selected mailbox window" },
-  { key: "relevant", label: "Relevant emails", hint: "Relevance score ≥ 50" },
-  { key: "processed", label: "Processed", hint: "Extracted with AI" },
-  { key: "dealsUpdated", label: "Deals updated", hint: "From processed emails" },
+  { key: "scanned", label: "Emails scanned", hint: "Across all syncs" },
+  { key: "relevant", label: "Relevant emails", hint: "Keyword relevance ≥ 40" },
+  { key: "processed", label: "Processed", hint: "Through the AI pipeline" },
+  { key: "deals_updated", label: "Deals updated", hint: "Created or updated" },
 ];
 
 /** `stats` is null before the first sync; `loading` shows placeholders during it. */

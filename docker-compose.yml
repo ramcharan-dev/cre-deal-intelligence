@@ -25,6 +25,8 @@ services:
       # Inside the compose network the database is always db:5432.
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
+      # Ollama runs on the host (`ollama serve`), not in compose.
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --no-access-log"
     ports:
       - "${BACKEND_PORT:-8000}:8000"

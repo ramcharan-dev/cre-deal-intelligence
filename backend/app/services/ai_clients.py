@@ -53,11 +53,17 @@ def get_cohere() -> cohere.AsyncClientV2:
 def provider_status() -> dict[str, dict[str, str | bool]]:
     """Which providers have credentials configured (no network calls)."""
     s = get_settings()
+    claude = s.extraction_provider == "claude"
     return {
         "anthropic": {
             "configured": _configured(s.anthropic_api_key),
             "model": s.anthropic_model,
-            "used_by": "email extraction",
+            "used_by": "email extraction" if claude else "not used (EXTRACTION_PROVIDER=ollama)",
+        },
+        "ollama": {
+            "configured": not claude,  # no key; reachability is checked when an email is processed
+            "model": s.ollama_model,
+            "used_by": "email extraction" if not claude else "not used (EXTRACTION_PROVIDER=claude)",
         },
         "voyage": {
             "configured": _configured(s.voyage_api_key),

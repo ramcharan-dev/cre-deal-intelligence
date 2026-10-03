@@ -17,7 +17,7 @@ from alembic.config import Config  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
 
-TABLES = ("extracted_values", "quotes", "emails", "lenders", "deals")
+TABLES = ("gmail_messages", "gmail_accounts", "extracted_values", "quotes", "emails", "lenders", "deals")
 
 
 def _connect(dbname: str) -> psycopg.Connection:

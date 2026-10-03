@@ -257,5 +257,9 @@ class ClaudeExtractor:
 
 
 def get_extractor() -> Extractor:
-    """FastAPI dependency. The runtime path always uses Claude; only tests override it."""
+    """FastAPI dependency: the provider selected by EXTRACTION_PROVIDER. Tests override it."""
+    if get_settings().extraction_provider == "ollama":
+        from app.extraction.ollama import OllamaExtractor  # imports this module
+
+        return OllamaExtractor()
     return ClaudeExtractor()

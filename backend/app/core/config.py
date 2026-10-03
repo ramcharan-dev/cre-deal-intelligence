@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     anthropic_timeout_seconds: float = 120.0
     anthropic_max_retries: int = 1
 
+    # Which model runs email extraction. `ollama` uses a local Ollama server with the same prompt and schema.
+    extraction_provider: Literal["claude", "ollama"] = "claude"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:7b"
+    # Must fit the prompt (instructions + candidate deals + email) plus the JSON output.
+    ollama_num_ctx: int = 16384
+    # Keep under the frontend proxy's 300s response-header timeout.
+    ollama_timeout_seconds: float = 280.0
+
     voyage_api_key: SecretStr | None = None
     voyage_embedding_model: str = "voyage-4-large"
     embedding_dimensions: int = 1024
@@ -51,9 +60,52 @@ class Settings(BaseSettings):
     max_email_bytes: int = 10 * 1024 * 1024
     max_deal_candidates: int = 200
 
+    # --- Gmail integration (Google OAuth 2.0 web client) ---
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    # Must exactly match an "Authorized redirect URI" of the OAuth client. Defaults to the frontend's
+    # proxy route so the OAuth state cookie stays on the browser-facing origin.
+    google_redirect_uri: str | None = None
+    # Fernet key that encrypts stored refresh tokens and the OAuth state cookie.
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    token_encryption_key: SecretStr | None = None
+    # Where the OAuth callback sends the browser afterwards. Defaults to the first CORS origin.
+    frontend_url: str | None = None
+    gmail_sync_default_days: int = 30
+    gmail_sync_max_messages: int = 100
+    gmail_fetch_concurrency: int = 8
+    gmail_timeout_seconds: float = 20.0
+    # Keyword relevance score (0-100) at or above which a synced message is stored for processing.
+    gmail_relevance_threshold: int = 40
+
+    @property
+    def frontend_base_url(self) -> str:
+        return (self.frontend_url or self.cors_origins[0]).rstrip("/")
+
+    @property
+    def gmail_redirect_uri(self) -> str:
+        return self.google_redirect_uri or f"{self.frontend_base_url}/api/gmail/oauth/callback"
+
+    @property
+    def gmail_configured(self) -> bool:
+        return bool(
+            self.google_client_id
+            and self.google_client_secret
+            and self.google_client_secret.get_secret_value()
+            and self.token_encryption_key
+            and self.token_encryption_key.get_secret_value()
+        )
+
     def secret_values(self) -> list[str]:
         """Configured secrets, for redaction in logs and error messages."""
-        secrets = (self.anthropic_api_key, self.voyage_api_key, self.cohere_api_key, self.postgres_password)
+        secrets = (
+            self.anthropic_api_key,
+            self.voyage_api_key,
+            self.cohere_api_key,
+            self.postgres_password,
+            self.google_client_secret,
+            self.token_encryption_key,
+        )
         return [v for s in secrets if s is not None and len(v := s.get_secret_value()) >= 8]
 
     @computed_field  # type: ignore[prop-decorator]
