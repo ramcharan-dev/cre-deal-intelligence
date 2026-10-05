@@ -53,7 +53,11 @@ def get_cohere() -> cohere.AsyncClientV2:
 def provider_status() -> dict[str, dict[str, str | bool]]:
     """Which providers have credentials configured (no network calls)."""
     s = get_settings()
+
+    claude = s.extraction_provider == "claude"
+
     active_provider = s.llm_provider.lower().strip() or "fallback"
+
     return {
         "gemini": {
             "configured": _configured(s.gemini_api_key),
@@ -67,8 +71,25 @@ def provider_status() -> dict[str, dict[str, str | bool]]:
         },
         "anthropic": {
             "configured": _configured(s.anthropic_api_key),
-            "model": s.llm_model if (active_provider in ("anthropic", "claude") and s.llm_model.strip()) else s.anthropic_model,
-            "used_by": "email extraction" if active_provider in ("anthropic", "claude") else "inactive",
+            "model": (
+                s.llm_model
+                if active_provider in ("anthropic", "claude") and s.llm_model.strip()
+                else s.anthropic_model
+            ),
+            "used_by": (
+                "email extraction"
+                if claude
+                else "not used (EXTRACTION_PROVIDER=ollama)"
+            ),
+        },
+        "ollama": {
+            "configured": not claude,
+            "model": s.ollama_model,
+            "used_by": (
+                "email extraction"
+                if not claude
+                else "not used (EXTRACTION_PROVIDER=claude)"
+            ),
         },
         "voyage": {
             "configured": _configured(s.voyage_api_key),

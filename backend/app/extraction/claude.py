@@ -257,5 +257,10 @@ class ClaudeExtractor:
 
 
 def get_extractor() -> Extractor:
-    """FastAPI dependency resolving the active LLM extractor based on configuration."""
+    """FastAPI dependency: the provider selected by EXTRACTION_PROVIDER. Tests override it."""
+    if get_settings().extraction_provider == "ollama":
+        from app.extraction.ollama import OllamaExtractor
+
+        return OllamaExtractor()
+
     return ClaudeExtractor()

@@ -111,6 +111,43 @@ Claude failures map to `not_configured`/`auth_failed`/`permission_denied`/`billi
 Bodies, query strings and email content are never logged, SQL parameters are hidden, configured secrets are
 redacted from every log line, and unhandled exceptions log only their type and stack frames.
 
+## Phase 3: Gmail integration
+
+`/integrations/gmail` connects a Gmail mailbox with Google OAuth 2.0 (scope `gmail.readonly` only) and feeds its
+messages into the same pipeline as uploads.
+
+1. **Connect** (`GET /api/gmail/oauth/start` → Google → `GET /api/gmail/oauth/callback`): web-server flow with PKCE
+   and offline access. `state` + PKCE verifier live in an encrypted, HttpOnly, 10-minute cookie. Only the refresh
+   token is stored, Fernet-encrypted with `TOKEN_ENCRYPTION_KEY`; access tokens are minted per request and never
+   stored or logged.
+2. **Sync** (`POST /api/gmail/sync`): lists the newest messages in a date window (default 30 days; chats, Promotions
+   and Social excluded), skips Gmail ids already stored (`gmail_messages` is unique on account + Gmail id), fetches
+   new ones as raw RFC 822, parses them with `email_parser`, and scores CRE relevance/category with keyword rules
+   (`services/gmail_relevance.py`, no AI call). Relevant messages are normalized into `emails` (status `received`).
+3. **Process** (`POST /api/gmail/messages/{id}/process`): passes the stored raw source to `ingest_email`, unchanged.
+4. **Disconnect** (`DELETE /api/gmail/connection`): revokes the token at Google and deletes the credentials and
+   message index; emails and extracted data are kept.
+
+Other endpoints: `GET /api/gmail/connection`, `GET /api/gmail/messages`, `GET /api/gmail/messages/{id}`.
+The browser reaches all of them through the frontend's `/api/gmail/*` proxy, which keeps the OAuth cookie on the
+frontend origin.
+
+**Setup**
+
+1. In Google Cloud, enable the **Gmail API** and configure the OAuth consent screen. While the app is in
+   *Testing*, add your Gmail address as a test user. Google expires refresh tokens for Testing apps after
+   7 days, after which the page asks you to reconnect.
+2. Create an OAuth client of type **Web application** with the authorized redirect URI
+   `http://localhost:$FRONTEND_PORT/api/gmail/oauth/callback`. Set `GOOGLE_REDIRECT_URI` if you use another URL.
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `TOKEN_ENCRYPTION_KEY` in `.env` (see `.env.example`), then
+   `docker compose up -d backend`.
+
+**Local extraction with Ollama**: set `EXTRACTION_PROVIDER=ollama` (and optionally `OLLAMA_MODEL`, default
+`qwen2.5:7b`). `extraction/ollama.py` sends the same prompt and `EmailExtraction` schema to Ollama's `/api/chat`
+with structured output; validation, matching and persistence are unchanged. Expect 1-2 minutes per email on
+a laptop. `OLLAMA_NUM_CTX` (default 16384) must fit the prompt, or Ollama silently truncates it.
+
+Tests fake Google with an `httpx.MockTransport` (`tests/test_gmail.py`), so no Google credentials are needed.
 ## POC demo (no AI model required)
 
 The POC runs end to end with the **demo extraction provider**: `DemoExtractor` (`app/extraction/demo.py`) replays
