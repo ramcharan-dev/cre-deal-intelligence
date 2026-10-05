@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatValue } from "@/lib/format";
+import { formatDate, formatValue, sourceHref } from "@/lib/format";
 import type { FieldType } from "@/lib/types";
 
 export type FieldRow = {
@@ -14,6 +14,8 @@ export type FieldRow = {
   applied?: boolean;
   source_email_id?: string | null;
   source_email_subject?: string | null;
+  source_email_sender?: string | null;
+  source_email_sent_at?: string | null;
 };
 
 /** Field / value / verbatim source text, optionally linking to the source email. */
@@ -54,9 +56,22 @@ export function FieldTable({ rows, empty = "No values extracted." }: { rows: Fie
             {showEmail && (
               <TableCell className="whitespace-normal">
                 {r.source_email_id ? (
-                  <Link href={`/emails/${r.source_email_id}`} className="underline-offset-4 hover:underline">
-                    {r.source_email_subject || "(no subject)"}
-                  </Link>
+                  <>
+                    <Link
+                      href={sourceHref(r.source_email_id, r.source_text)}
+                      className="underline-offset-4 hover:underline"
+                      title="Open the email with this text highlighted"
+                    >
+                      {r.source_email_subject || "(no subject)"}
+                    </Link>
+                    {(r.source_email_sender || r.source_email_sent_at) && (
+                      <span className="text-muted-foreground block text-xs">
+                        {[r.source_email_sender, r.source_email_sent_at && formatDate(r.source_email_sent_at, { dateStyle: "medium" })]
+                          .filter(Boolean)
+                          .join(" — ")}
+                      </span>
+                    )}
+                  </>
                 ) : (
                   "—"
                 )}

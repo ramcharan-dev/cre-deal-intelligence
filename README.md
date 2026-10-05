@@ -110,3 +110,41 @@ Claude failures map to `not_configured`/`auth_failed`/`permission_denied`/`billi
 `X-Request-ID`, and one line per Claude call (model, effort, stop reason, token usage, Anthropic request id).
 Bodies, query strings and email content are never logged, SQL parameters are hidden, configured secrets are
 redacted from every log line, and unhandled exceptions log only their type and stack frames.
+
+## POC demo (no AI model required)
+
+The POC runs end to end with the **demo extraction provider**: `DemoExtractor` (`app/extraction/demo.py`) replays
+hand-written extractions for the bundled demo emails in `backend/demo_data/` (15 emails, 5 deals, 6 lenders,
+9 quotes, 2 historical 2025 deals, 1 non-deal newsletter, 1 email with an attached term sheet). Its output goes
+through the normal validation → matching → persistence pipeline, so every value still needs verbatim source text.
+
+Providers sit behind one interface: business logic uses `app.extraction.base.Extractor`, and
+`app.extraction.providers` picks the implementation from `LLM_PROVIDER` (`demo`, `fallback`, `gemini`,
+`groq`, and `claude`/`anthropic` are supported). Copilot has multi-provider fallback (Gemini → Groq → Deterministic).
+
+```bash
+# 1. In .env set LLM_PROVIDER=demo (needed only for uploads through the UI/API), then:
+docker compose up -d --build
+# 2. Load the demo emails (always uses the demo provider; safe to re-run)
+docker compose exec backend python -m app.scripts.seed_demo
+```
+
+Demo walkthrough:
+
+1. **Email → identification → extraction:** `/emails` lists the processed emails. Opening one shows its type
+   (deal submission / lender quote / update / other), the matched deal and how it was matched (same thread,
+   property address, property name), and each extracted value with its verbatim source text.
+2. **Dashboard:** `/deals` shows active vs. historical deals, quote/lender counts, lowest fixed rate and max proceeds.
+3. **Quote comparison:** *The Lofts at Riverbend* has 4 competing lenders (Beacon term sheet, Northmark, Summit
+   floating, Granite declined). Best comparable values are highlighted (fixed rates vs. fixed only).
+4. **Sources:** click any value (comparison, summary, field tables) to open the email with that text highlighted.
+5. **Copilot:** `/copilot` or the box on a deal page: "Compare lender quotes for this deal", "Which lender has the
+   lowest fixed rate?", "Which lender declined?", "What are the pending actions?", "What lenders are associated
+   with this deal?", or search history (e.g. "When did Cedar Grove close?"). Every item links to its source email.
+
+To show a live upload, start from an empty database and upload `01_deal_submission.eml` and then
+`02_lender_quote_reply.eml` (from `backend/demo_data/emails/`) on `/emails`: the first creates a new deal, the second
+is a lender quote matched to it by email thread. Then run the seed script to load the rest; emails already uploaded
+are skipped. Re-uploading an already processed email returns the stored result. The demo provider only recognises
+the bundled demo emails; any other email returns a clear `not_configured` error until a real model provider is
+configured.

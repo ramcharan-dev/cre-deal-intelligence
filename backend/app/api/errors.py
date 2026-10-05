@@ -46,9 +46,9 @@ EXTRACTION_STATUS: dict[ErrorCode, int] = {
     "upstream_error": status.HTTP_502_BAD_GATEWAY,
     "timeout": status.HTTP_504_GATEWAY_TIMEOUT,
     "connection_error": status.HTTP_502_BAD_GATEWAY,
-    "refused": status.HTTP_422_UNPROCESSABLE_CONTENT,
-    "truncated": status.HTTP_422_UNPROCESSABLE_CONTENT,
-    "invalid_output": status.HTTP_422_UNPROCESSABLE_CONTENT,
+    "refused": getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY),
+    "truncated": getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY),
+    "invalid_output": getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY),
 }
 
 
