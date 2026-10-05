@@ -1,6 +1,5 @@
-"""Email upload → parse → Claude extraction → validation → deal matching → persistence."""
-
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -20,7 +19,7 @@ from app.api.schemas import (
 from app.extraction.claude import ExtractionError, Extractor
 from app.extraction.fields import DEAL_FIELD_SPECS, QUOTE_FIELD_SPECS, FieldSpec
 from app.extraction.matching import DealCandidate, DealResolution, normalize_name, resolve_deal
-from app.extraction.schemas import TypedValue, ValidatedExtraction, ValidatedField
+from app.extraction.schemas import EmailType, TypedValue, ValidatedExtraction, ValidatedField, ValidatedLenderQuote
 from app.extraction.validation import validate_extraction
 from app.models import Deal, Email, ExtractedValue, Lender, Quote
 from app.services.email_parser import ParsedEmail, parse_email
@@ -28,6 +27,50 @@ from app.services.email_parser import ParsedEmail, parse_email
 log = logging.getLogger(__name__)
 
 LENDER_FIELD_LABELS = {"name": "Lender", "contact_name": "Lender contact", "contact_email": "Lender email"}
+
+_QUOTED_REPLY_RE = re.compile(
+    r"(?:^-{2,}\s*Original Message\s*-{2,}.*|^On\s+.+?wrote:.*|^From:\s*.+?\nSent:\s*.+?\nTo:\s*.+?\nSubject:\s*.*)",
+    re.MULTILINE | re.DOTALL,
+)
+_QUOTED_LINE_RE = re.compile(r"^>.*$", re.MULTILINE)
+
+_DECLINE_RE = re.compile(
+    r"\b(we\s*(?:will\s*)?pass(?:ed)?|unable\s*to\s*(?:quote|offer|participate|proceed)|"
+    r"pass(?:ing)?\s*(?:on|at\s*this\s*time)?|declined?|turned\s*down|"
+    r"out\s*of\s*(?:multifamily|office|retail|industrial)|not\s*a\s*fit|"
+    r"credit\s*(?:team\s*)?passed)\b",
+    re.IGNORECASE,
+)
+
+_CLOSING_RE = re.compile(
+    r"\b((?:deal|loan|transaction)\s*(?:has\s*)?closed|closing\s*(?:is\s*)?confirmed|closing\s*notice|loan\s*funded|financing\s*closed)\b",
+    re.IGNORECASE,
+)
+
+
+def reconcile_email_type(
+    email_type: EmailType,
+    quotes: list[ValidatedLenderQuote],
+    deal_fields: list[ValidatedField],
+    body_text: str,
+) -> EmailType:
+    """Enforces domain rules for classification regardless of extractor output."""
+    # 1. If quotes with financial terms exist, it is a lender quote
+    if quotes:
+        return "lender_quote"
+
+    clean_b = _QUOTED_REPLY_RE.sub("", body_text)
+    clean_body = _QUOTED_LINE_RE.sub("", clean_b).strip() or body_text
+
+    # 2. If a lender decline is stated in the body
+    if _DECLINE_RE.search(clean_body):
+        return "lender_quote"
+
+    # 3. If closing or funding confirmed
+    if _CLOSING_RE.search(clean_body):
+        return "deal_update"
+
+    return email_type
 
 
 class IngestionError(RuntimeError):
@@ -264,7 +307,14 @@ async def ingest_email(
         await db.commit()
         log.warning("email %s extraction failed code=%s", email.id, exc.code)
         raise IngestionError(exc, email.id) from exc
+    except Exception as exc:
+        log.exception("Unhandled error during email %s extraction: %s", email.id, exc)
+        err = ExtractionError("upstream_error", f"Extraction failed: {type(exc).__name__}")
+        email.status, email.error = "failed", f"[{err.code}] {err.message}"
+        await db.commit()
+        raise IngestionError(err, email.id) from exc
 
+    email.model = getattr(extractor, "model", email.model)
     validated = validate_extraction(raw_extraction, parsed.as_prompt_text(), {c.id for c in candidates})
     resolution = resolve_deal(validated, candidates, thread_deal_id)
 
@@ -373,8 +423,11 @@ async def _persist(
             )
         deal.updated_at = datetime.now(UTC)
 
+    final_email_type = reconcile_email_type(
+        validated.email_type, validated.quotes, validated.deal_fields, parsed.body_text
+    )
     email.deal_id = deal.id if deal else None
-    email.email_type = validated.email_type
+    email.email_type = final_email_type
     email.summary = validated.summary
     email.status = "processed"
     email.processed_at = datetime.now(UTC)
@@ -382,7 +435,7 @@ async def _persist(
     return EmailProcessingResult(
         email=_summary(email, parsed),
         status="processed",
-        email_type=validated.email_type,
+        email_type=final_email_type,
         summary=validated.summary,
         model=email.model,
         duplicate=False,

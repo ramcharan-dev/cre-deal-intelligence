@@ -188,7 +188,7 @@ def build_user_message(email: ParsedEmail, candidates: list[DealCandidate]) -> s
 class ClaudeExtractor:
     def __init__(self, client: anthropic.AsyncAnthropic | None = None) -> None:
         settings = get_settings()
-        self.model = settings.anthropic_model
+        self.model = settings.llm_model.strip() or settings.anthropic_model
         self._effort = settings.anthropic_effort
         self._max_tokens = settings.anthropic_max_tokens
         self._client = client  # injected in tests; otherwise the shared configured client
@@ -257,5 +257,5 @@ class ClaudeExtractor:
 
 
 def get_extractor() -> Extractor:
-    """FastAPI dependency. The runtime path always uses Claude; only tests override it."""
+    """FastAPI dependency resolving the active LLM extractor based on configuration."""
     return ClaudeExtractor()

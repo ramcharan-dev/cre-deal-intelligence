@@ -79,6 +79,8 @@ export type SourcedValue = {
   source_email_subject: string | null;
   source_text: string | null;
   extracted_at: string | null;
+  source_email_sender?: string | null;
+  source_email_sent_at?: string | null;
 };
 
 export type DealListItem = {
@@ -91,6 +93,12 @@ export type DealListItem = {
   quote_count: number;
   email_count: number;
   updated_at: string;
+  lender_count: number;
+  max_loan_amount: string | null;
+  lowest_fixed_rate: string | null;
+  lowest_fixed_rate_lender: string | null;
+  last_activity_at: string | null;
+  is_historical: boolean;
 };
 
 export type DealDetail = {
@@ -117,6 +125,44 @@ export type DealDetail = {
     email_type: string | null;
     summary: string | null;
   }[];
+  summary: DealSummary | null;
+};
+
+/** Where a statement comes from: the email and, when available, the verbatim text. */
+export type SourceRef = {
+  email_id: string;
+  email_subject: string;
+  email_sender: string | null;
+  email_sent_at: string | null;
+  source_text: string | null;
+  label: string | null;
+};
+
+export type DealSummary = {
+  headline: string;
+  points: { text: string; sources: SourceRef[] }[];
+};
+
+export type EmailSource = {
+  id: string;
+  subject: string;
+  sender: string | null;
+  sent_at: string | null;
+  deal_id: string | null;
+  email_type: string | null;
+  summary: string | null;
+  attachment_names: string[];
+  text: string;
+};
+
+export type CopilotAnswer = {
+  question: string;
+  intent: string;
+  mode: "structured" | "search" | "llm";
+  deal_id: string | null;
+  deal_name: string | null;
+  answer: string;
+  items: { title: string | null; text: string; deal_id: string | null; sources: SourceRef[] }[];
 };
 
 export type ApiErrorDetail = {

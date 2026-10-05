@@ -42,8 +42,19 @@ export function formatDate(
 export const MATCH_METHOD_LABELS: Record<string, string> = {
   email_thread: "Same email thread",
   address: "Property address match",
-  claude: "Matched by Claude",
+  claude: "Matched by AI model",
   property_name: "Property name match",
   new: "New deal",
   none: "Not a deal email",
 };
+
+/** Link to the source email with the cited text highlighted. */
+export function sourceHref(emailId: string, sourceText?: string | null): string {
+  const q = sourceText ? `?highlight=${encodeURIComponent(sourceText)}` : "";
+  return `/emails/${emailId}${q}#source`;
+}
+
+/** "dokafor@northmarklife.com — Sep 22, 2026": who sent the source email, and when. */
+export function sourceLabel(sender: string | null | undefined, sentAt: string | null | undefined): string {
+  return `${sender ?? "Email"} — ${formatDate(sentAt, { dateStyle: "medium" })}`;
+}

@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     db_max_overflow: int = 10
 
     # --- AI providers (keys optional until features use them) ---
+    llm_provider: str = ""
+    llm_model: str = ""
+
     anthropic_api_key: SecretStr | None = None
     # Required only when the API key is not scoped to a single workspace.
     anthropic_workspace_id: str | None = None
@@ -47,13 +50,31 @@ class Settings(BaseSettings):
     cohere_api_key: SecretStr | None = None
     cohere_rerank_model: str = "rerank-v4.0-pro"
 
+    # --- Copilot AI providers ---
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_timeout_seconds: float = 30.0
+
+    groq_api_key: SecretStr | None = None
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_timeout_seconds: float = 30.0
+
+    copilot_provider_order: str = "gemini,groq,deterministic"
+
     # --- Email ingestion ---
     max_email_bytes: int = 10 * 1024 * 1024
     max_deal_candidates: int = 200
 
     def secret_values(self) -> list[str]:
         """Configured secrets, for redaction in logs and error messages."""
-        secrets = (self.anthropic_api_key, self.voyage_api_key, self.cohere_api_key, self.postgres_password)
+        secrets = (
+            self.anthropic_api_key,
+            self.voyage_api_key,
+            self.cohere_api_key,
+            self.gemini_api_key,
+            self.groq_api_key,
+            self.postgres_password,
+        )
         return [v for s in secrets if s is not None and len(v := s.get_secret_value()) >= 8]
 
     @computed_field  # type: ignore[prop-decorator]

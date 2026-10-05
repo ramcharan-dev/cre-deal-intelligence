@@ -19,8 +19,8 @@ export default async function EmailsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Email intelligence</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Upload a broker or lender email. Claude extracts deal and quote terms, matches it to a deal, and records
-            the exact source text for every value.
+            Upload a broker or lender email. The configured extraction provider pulls out deal and quote terms, the
+            email is matched to a deal, and the exact source text is recorded for every value.
           </p>
         </div>
         <EmailUploader />
