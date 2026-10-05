@@ -1,50 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CopilotAsk } from "@/components/copilot-ask";
 import { FieldTable } from "@/components/field-table";
+import { QuoteComparison } from "@/components/quote-comparison";
+import { SourceLinks } from "@/components/source-links";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDeal } from "@/lib/api";
-import { formatDate, formatValue, humanize } from "@/lib/format";
-import type { DealDetail } from "@/lib/types";
-
-const COMPARE_FIELDS = ["loan_amount", "ltv", "interest_rate", "spread_bps", "term_months", "recourse", "quote_status"];
-
-function QuoteComparison({ quotes }: { quotes: DealDetail["quotes"] }) {
-  const cell = (q: DealDetail["quotes"][number], field: string) => {
-    const f = q.fields.find((x) => x.field === field);
-    return f ? formatValue(f.type, f.value) : "—";
-  };
-  const labels = Object.fromEntries(quotes.flatMap((q) => q.fields.map((f) => [f.field, f.label])));
-  const columns = COMPARE_FIELDS.filter((f) => labels[f]);
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Lender</TableHead>
-          {columns.map((f) => (
-            <TableHead key={f}>{labels[f]}</TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {quotes.map((q) => (
-          <TableRow key={q.id}>
-            <TableCell className="font-medium">
-              {q.lender_name}
-              {q.option_label && <span className="text-muted-foreground font-normal"> · {q.option_label}</span>}
-            </TableCell>
-            {columns.map((f) => (
-              <TableCell key={f} className="tabular-nums">
-                {cell(q, f)}
-              </TableCell>
-            ))}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
+import { formatDate, humanize } from "@/lib/format";
 
 export default async function DealPage(props: PageProps<"/deals/[id]">) {
   const { id } = await props.params;
@@ -63,6 +26,48 @@ export default async function DealPage(props: PageProps<"/deals/[id]">) {
         </p>
       </div>
 
+      {deal.summary && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Deal summary</CardTitle>
+            <CardDescription>Built only from extracted values; each line links to its source.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3 text-sm">
+              {deal.summary.points.map((p, i) => (
+                <li key={i}>
+                  {p.text}
+                  <SourceLinks sources={p.sources} />
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ask Copilot about this deal</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CopilotAsk dealId={deal.id} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quote comparison ({deal.quotes.length})</CardTitle>
+          <CardDescription>All lender quotes side by side, newest stated value for each term.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {deal.quotes.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No quotes yet.</p>
+          ) : (
+            <QuoteComparison quotes={deal.quotes} />
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Deal details</CardTitle>
@@ -73,34 +78,29 @@ export default async function DealPage(props: PageProps<"/deals/[id]">) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lender quotes ({deal.quotes.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          {deal.quotes.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No quotes yet.</p>
-          ) : (
-            <>
-              {deal.quotes.length > 1 && <QuoteComparison quotes={deal.quotes} />}
-              {deal.quotes.map((q) => (
-                <div key={q.id} className="space-y-2">
-                  <h3 className="font-medium">
-                    {q.lender_name}
-                    {q.option_label && <span className="text-muted-foreground font-normal"> · {q.option_label}</span>}
-                  </h3>
-                  {(q.lender_contact_name || q.lender_contact_email) && (
-                    <p className="text-muted-foreground text-sm">
-                      {[q.lender_contact_name, q.lender_contact_email].filter(Boolean).join(" · ")}
-                    </p>
-                  )}
-                  <FieldTable rows={q.fields} empty="No terms extracted." />
-                </div>
-              ))}
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {deal.quotes.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Lender quotes with sources</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            {deal.quotes.map((q) => (
+              <div key={q.id} className="space-y-2">
+                <h3 className="font-medium">
+                  {q.lender_name}
+                  {q.option_label && <span className="text-muted-foreground font-normal"> · {q.option_label}</span>}
+                </h3>
+                {(q.lender_contact_name || q.lender_contact_email) && (
+                  <p className="text-muted-foreground text-sm">
+                    {[q.lender_contact_name, q.lender_contact_email].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+                <FieldTable rows={q.fields} empty="No terms extracted." />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

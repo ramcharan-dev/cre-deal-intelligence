@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 const LINKS = [
-  { href: "/emails", label: "Emails" },
-  { href: "/deals", label: "Deals" },
   { href: "/integrations/gmail", label: "Gmail" },
+  { href: "/deals", label: "Dashboard" },
+  { href: "/copilot", label: "Copilot" },
   { href: "/", label: "Status" },
 ];
 
@@ -16,7 +16,11 @@ export function SiteNav() {
         </Link>
         <div className="flex gap-4">
           {LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className="text-muted-foreground hover:text-foreground">
+            <Link
+              key={l.href}
+              href={l.href}
+              className="text-muted-foreground hover:text-foreground"
+            >
               {l.label}
             </Link>
           ))}

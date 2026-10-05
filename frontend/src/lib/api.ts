@@ -1,6 +1,13 @@
 import "server-only";
 
-import type { DealDetail, DealListItem, EmailListItem, EmailProcessingResult } from "@/lib/types";
+import type {
+  CopilotAnswer,
+  DealDetail,
+  DealListItem,
+  EmailListItem,
+  EmailProcessingResult,
+  EmailSource,
+} from "@/lib/types";
 
 /** Base URL for server-side calls to the FastAPI backend (container network in Docker). */
 export const BACKEND_URL = process.env.BACKEND_INTERNAL_URL ?? "http://localhost:8000";
@@ -55,3 +62,17 @@ export const getDeal = (id: string) => getJson<DealDetail>(`/api/deals/${encodeU
 export const getEmails = async () => (await getJson<EmailListItem[]>("/api/emails?limit=25")) ?? [];
 export const getEmailResult = (id: string) =>
   getJson<EmailProcessingResult>(`/api/emails/${encodeURIComponent(id)}`);
+export const getEmailSource = (id: string) =>
+  getJson<EmailSource>(`/api/emails/${encodeURIComponent(id)}/source`);
+
+export async function askCopilot(question: string, dealId?: string): Promise<CopilotAnswer> {
+  const res = await fetch(`${BACKEND_URL}/api/copilot`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question, deal_id: dealId || null }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`Backend /api/copilot returned ${res.status}`);
+  return (await res.json()) as CopilotAnswer;
+}

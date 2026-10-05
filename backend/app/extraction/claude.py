@@ -188,7 +188,7 @@ def build_user_message(email: ParsedEmail, candidates: list[DealCandidate]) -> s
 class ClaudeExtractor:
     def __init__(self, client: anthropic.AsyncAnthropic | None = None) -> None:
         settings = get_settings()
-        self.model = settings.anthropic_model
+        self.model = settings.llm_model.strip() or settings.anthropic_model
         self._effort = settings.anthropic_effort
         self._max_tokens = settings.anthropic_max_tokens
         self._client = client  # injected in tests; otherwise the shared configured client
@@ -259,7 +259,8 @@ class ClaudeExtractor:
 def get_extractor() -> Extractor:
     """FastAPI dependency: the provider selected by EXTRACTION_PROVIDER. Tests override it."""
     if get_settings().extraction_provider == "ollama":
-        from app.extraction.ollama import OllamaExtractor  # imports this module
+        from app.extraction.ollama import OllamaExtractor
 
         return OllamaExtractor()
+
     return ClaudeExtractor()

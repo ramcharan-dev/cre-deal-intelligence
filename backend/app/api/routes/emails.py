@@ -8,13 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.errors import EXTRACTION_STATUS, ApiError, error_responses
-from app.api.schemas import EmailListItem, EmailProcessingResult
+from app.api.schemas import EmailListItem, EmailProcessingResult, EmailSource
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.extraction.claude import Extractor, get_extractor
+from app.extraction.base import Extractor
+from app.extraction.providers import get_extractor
 from app.models import Email
 from app.services.email_ingestion import IngestionError, ingest_email
-from app.services.email_parser import EmailParseError
+from app.services.email_parser import EmailParseError, parse_email
 
 router = APIRouter(prefix="/emails", tags=["emails"])
 
@@ -37,15 +38,15 @@ class EmailUploadForm(BaseModel):
     description=(
         "Runs the full pipeline synchronously (typically 20–90 s):\n\n"
         "1. **Parse** subject, sender, recipients, date, thread headers and text body.\n"
-        "2. **Extract** deal and lender-quote fields with Claude (structured output). "
+        "2. **Extract** deal and lender-quote fields with the configured model provider (structured output). "
         "Every value carries a verbatim `source_text` span.\n"
         "3. **Validate** each value's type/bounds and that its `source_text` occurs in the email; "
         "rejects are returned in `issues`.\n"
-        "4. **Match** to an existing deal (thread → address → Claude → property name) or create one.\n"
+        "4. **Match** to an existing deal (thread → address → model's pick → property name) or create one.\n"
         "5. **Persist** deal, lender and quote records plus a provenance row per value "
         "(`source_email_id` + `source_text`).\n\n"
         "Uploading an already processed email returns the stored result with `duplicate: true` and no "
-        "Claude call. A previously failed email is re-processed."
+        "model call. A previously failed email is re-processed."
     ),
     responses=error_responses(400, 413, 422, 429, 502, 503, 504),
 )
@@ -118,3 +119,36 @@ async def get_email_result(email_id: uuid.UUID, db: DbDep) -> EmailProcessingRes
     if email.result is None:
         raise ApiError(status.HTTP_409_CONFLICT, "not_processed", email.error or f"Email is {email.status}")
     return EmailProcessingResult.model_validate(email.result)
+
+
+@router.get(
+    "/{email_id}/source",
+    response_model=EmailSource,
+    summary="Get an email's original text",
+    description=(
+        "Headers and body exactly as the extractor saw them, so every stored `source_text` can be located "
+        "and highlighted. Attachments are listed but not read."
+    ),
+    responses=error_responses(404),
+)
+async def get_email_source(email_id: uuid.UUID, db: DbDep) -> EmailSource:
+    email = await db.get(Email, email_id)
+    if email is None:
+        raise ApiError(status.HTTP_404_NOT_FOUND, "not_found", "Email not found")
+    try:
+        parsed = parse_email(email.raw_source.encode("utf-8"))
+        text, attachments = parsed.as_prompt_text(), parsed.attachment_names
+        sender = parsed.sender.display() if parsed.sender else email.sender_email
+    except EmailParseError:
+        text, attachments, sender = email.body_text, [], email.sender_email
+    return EmailSource(
+        id=email.id,
+        subject=email.subject,
+        sender=sender,
+        sent_at=email.sent_at,
+        deal_id=email.deal_id,
+        email_type=email.email_type,
+        summary=email.summary,
+        attachment_names=attachments,
+        text=text,
+    )
