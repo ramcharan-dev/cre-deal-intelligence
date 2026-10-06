@@ -10,7 +10,7 @@ import type {
 } from "@/lib/types";
 
 /** Base URL for server-side calls to the FastAPI backend (container network in Docker). */
-export const BACKEND_URL = process.env.BACKEND_INTERNAL_URL ?? "http://localhost:8000";
+export const BACKEND_URL = process.env.BACKEND_INTERNAL_URL ?? "http://localhost:8001";
 
 export type ProviderStatus = { configured: boolean; model: string; used_by: string };
 
