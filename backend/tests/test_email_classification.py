@@ -13,12 +13,10 @@ Verifies:
 
 import asyncio
 
-import pytest
-
-from app.extraction.fallback import FallbackExtractorRouter, GeminiExtractor, GroqExtractor
+from app.extraction.fallback import FallbackExtractorRouter
 from app.extraction.local import LocalExtractor
 from app.extraction.matching import DealCandidate
-from app.extraction.schemas import SourcedText, ValidatedField, ValidatedLenderQuote
+from app.extraction.schemas import ValidatedField, ValidatedLenderQuote
 from app.extraction.validation import validate_extraction
 from app.services.email_ingestion import reconcile_email_type
 from app.services.email_parser import parse_email
@@ -102,7 +100,9 @@ def test_lender_quote_reply_with_re_subject_classified_as_lender_quote() -> None
         message_id="<quote-northmark-003@northmarkcap.com>",
     )
     email = parse_email(raw)
-    candidate = DealCandidate(id="deal-phx", deal_name="Phoenix Gateway Industrial", property_name="Phoenix Gateway Industrial")
+    candidate = DealCandidate(
+        id="deal-phx", deal_name="Phoenix Gateway Industrial", property_name="Phoenix Gateway Industrial"
+    )
     extractor = LocalExtractor()
     extraction = asyncio.run(extractor.extract(email, [candidate]))
 
@@ -145,7 +145,9 @@ def test_lender_financing_proposal_subject_classified_as_lender_quote() -> None:
         message_id="<prop-pacific-004@pacificcomfinance.com>",
     )
     email = parse_email(raw)
-    candidate = DealCandidate(id="deal-phx", deal_name="Phoenix Gateway Industrial", property_name="Phoenix Gateway Industrial")
+    candidate = DealCandidate(
+        id="deal-phx", deal_name="Phoenix Gateway Industrial", property_name="Phoenix Gateway Industrial"
+    )
     extractor = LocalExtractor()
     extraction = asyncio.run(extractor.extract(email, [candidate]))
 
@@ -178,7 +180,9 @@ def test_lender_decline_classified_as_lender_quote_with_declined_status() -> Non
         message_id="<decline-apex-005@apexdebtpartners.com>",
     )
     email = parse_email(raw)
-    candidate = DealCandidate(id="deal-phx", deal_name="Phoenix Gateway Industrial", property_name="Phoenix Gateway Industrial")
+    candidate = DealCandidate(
+        id="deal-phx", deal_name="Phoenix Gateway Industrial", property_name="Phoenix Gateway Industrial"
+    )
     extractor = LocalExtractor()
     extraction = asyncio.run(extractor.extract(email, [candidate]))
 
@@ -203,7 +207,9 @@ def test_lender_unable_to_quote_decline() -> None:
         message_id="<decline-beacon-006@beaconagency.com>",
     )
     email = parse_email(raw)
-    candidate = DealCandidate(id="deal-rb", deal_name="The Lofts at Riverbend", property_name="The Lofts at Riverbend")
+    candidate = DealCandidate(
+        id="deal-rb", deal_name="The Lofts at Riverbend", property_name="The Lofts at Riverbend"
+    )
     extractor = LocalExtractor()
     extraction = asyncio.run(extractor.extract(email, [candidate]))
 

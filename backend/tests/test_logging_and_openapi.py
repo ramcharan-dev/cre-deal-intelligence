@@ -17,6 +17,14 @@ def test_redacts_provider_key_shapes() -> None:
     assert redact(text) == "keys [REDACTED] and [REDACTED] and [REDACTED]"
 
 
+def test_redacts_google_token_shapes() -> None:
+    text = (
+        "access ya29.a0AfB_byC-abcdefghijkl refresh 1//0gAbCdEfGhIjKlMnOpQrStUv "
+        "code 4/0AVHEtk7abcdefghijklmnopqrs secret GOCSPX-abcdefghijklmnop"
+    )
+    assert redact(text) == "access [REDACTED] refresh [REDACTED] code [REDACTED] secret [REDACTED]"
+
+
 def test_redacts_configured_secrets(monkeypatch) -> None:
     class S:
         def secret_values(self) -> list[str]:
@@ -82,6 +90,9 @@ def test_unhandled_exception_returns_json_500_without_leaking_message(caplog) ->
 # ---------------------------------------------------------------- OpenAPI
 
 
+REDIRECT_OPERATIONS = {"oauth_start": "302", "oauth_callback": "303"}
+
+
 def test_every_operation_is_documented() -> None:
     spec = app.openapi()
     ids = []
@@ -90,9 +101,14 @@ def test_every_operation_is_documented() -> None:
             ids.append(op["operationId"])
             assert op.get("tags"), f"{method} {path} has no tag"
             assert op.get("summary"), f"{method} {path} has no summary"
+            if "gmail" in op["tags"]:
+                assert op.get("description"), f"{method} {path} has no description"
+            if op["operationId"] in REDIRECT_OPERATIONS:
+                assert REDIRECT_OPERATIONS[op["operationId"]] in op["responses"], path
+                continue
             assert "$ref" in str(op["responses"]["200"]["content"]["application/json"]["schema"]), path
-    assert len(ids) == len(set(ids)) == 7
-    assert {t["name"] for t in spec["tags"]} == {"emails", "deals", "health"}
+    assert len(ids) == len(set(ids)) == 18
+    assert {t["name"] for t in spec["tags"]} == {"emails", "deals", "copilot", "gmail", "health"}
 
 
 def test_upload_documents_multipart_body_and_errors() -> None:

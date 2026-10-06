@@ -11,13 +11,20 @@ from psycopg import sql
 
 os.environ["POSTGRES_DB"] = os.environ.get("POSTGRES_DB", "cre_deal_intel") + "_test"
 os.environ["ANTHROPIC_API_KEY"] = ""  # never call the real API from tests
+# Pin provider selection so a developer's .env (e.g. EXTRACTION_PROVIDER=ollama, LLM_PROVIDER=gemini, an explicit
+# GOOGLE_REDIRECT_URI) can't route tests to real models or change the expected OAuth URLs.
+os.environ["LLM_PROVIDER"] = ""
+os.environ["EXTRACTION_PROVIDER"] = "claude"
+os.environ["GEMINI_API_KEY"] = ""
+os.environ["GROQ_API_KEY"] = ""
+os.environ["GOOGLE_REDIRECT_URI"] = ""
 
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
 
-TABLES = ("extracted_values", "quotes", "emails", "lenders", "deals")
+TABLES = ("gmail_messages", "gmail_accounts", "extracted_values", "quotes", "emails", "lenders", "deals")
 
 
 def _connect(dbname: str) -> psycopg.Connection:

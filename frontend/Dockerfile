@@ -10,7 +10,8 @@ RUN npm ci
 FROM deps AS dev
 COPY . .
 EXPOSE 3000
-CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]
+# Inside the container Next.js always listens on 3000; compose maps it to host FRONTEND_PORT (3001).
+CMD ["npx", "next", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
 
 FROM deps AS build
 COPY . .

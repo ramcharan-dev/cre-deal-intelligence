@@ -24,6 +24,7 @@ from app.core.config import Settings, get_settings
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
     from app.models import Deal
 
 logger = logging.getLogger("app.copilot.providers")
@@ -72,7 +73,7 @@ def format_search_context(hits: list[SearchHit]) -> tuple[str, list[AnswerItem]]
         if h.source:
             sender = f" from {h.source.email_sender}" if h.source.email_sender else ""
             sent = f" ({h.source.email_sent_at.strftime('%Y-%m-%d')})" if h.source.email_sent_at else ""
-            source_info = f" | Source: \"{h.source.email_subject}\"{sender}{sent}"
+            source_info = f' | Source: "{h.source.email_subject}"{sender}{sent}'
 
         lines.append(f"[{i}] ({h.kind.upper()}) {item.title}\nContent: {h.snippet}{source_info}")
 
@@ -83,11 +84,7 @@ def format_search_context(hits: list[SearchHit]) -> tuple[str, list[AnswerItem]]
 def build_user_prompt(question: str, context_text: str, deal_name: str | None = None) -> str:
     deal_header = f"Scope: Deal '{deal_name}'\n" if deal_name else "Scope: Active Deals / Portfolio\n"
     return (
-        f"{deal_header}"
-        f"User Question: {question}\n\n"
-        f"Retrieved Records & Context:\n"
-        f"{context_text}\n\n"
-        f"Answer:"
+        f"{deal_header}User Question: {question}\n\nRetrieved Records & Context:\n{context_text}\n\nAnswer:"
     )
 
 
@@ -102,7 +99,9 @@ class CopilotProvider(Protocol):
 class GeminiCopilotProvider:
     name: str = "gemini"
 
-    def __init__(self, settings: Settings | None = None, http_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, settings: Settings | None = None, http_client: httpx.AsyncClient | None = None
+    ) -> None:
         self.settings = settings or get_settings()
         self.http_client = http_client
         self.timeout_seconds = self.settings.gemini_timeout_seconds
@@ -124,9 +123,7 @@ class GeminiCopilotProvider:
 
         prompt = build_user_prompt(context.question, context.context_text, context.deal_name)
         payload: dict[str, Any] = {
-            "system_instruction": {
-                "parts": [{"text": COPILOT_SYSTEM_PROMPT}]
-            },
+            "system_instruction": {"parts": [{"text": COPILOT_SYSTEM_PROMPT}]},
             "contents": [
                 {
                     "role": "user",
@@ -209,7 +206,9 @@ class GeminiCopilotProvider:
 class GroqCopilotProvider:
     name: str = "groq"
 
-    def __init__(self, settings: Settings | None = None, http_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, settings: Settings | None = None, http_client: httpx.AsyncClient | None = None
+    ) -> None:
         self.settings = settings or get_settings()
         self.http_client = http_client
         self.timeout_seconds = self.settings.groq_timeout_seconds

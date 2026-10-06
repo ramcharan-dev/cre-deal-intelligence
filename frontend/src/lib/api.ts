@@ -10,7 +10,7 @@ import type {
 } from "@/lib/types";
 
 /** Base URL for server-side calls to the FastAPI backend (container network in Docker). */
-export const BACKEND_URL = process.env.BACKEND_INTERNAL_URL ?? "http://localhost:8000";
+export const BACKEND_URL = process.env.BACKEND_INTERNAL_URL ?? "http://localhost:8001";
 
 export type ProviderStatus = { configured: boolean; model: string; used_by: string };
 
@@ -38,7 +38,12 @@ export async function getBackendHealth(): Promise<BackendHealth> {
       signal: AbortSignal.timeout(5000),
     });
     // 503 still carries a readiness body describing what is degraded.
-    return { reachable: true, data: (await res.json()) as ReadinessResponse };
+    const body = (await res.json().catch(() => null)) as ReadinessResponse | null;
+    if ((!res.ok && res.status !== 503) || !body?.database || !body.providers) {
+      // e.g. BACKEND_INTERNAL_URL points at a different service
+      return { reachable: false, error: `${BACKEND_URL} returned HTTP ${res.status}, not a readiness report` };
+    }
+    return { reachable: true, data: body };
   } catch (err) {
     return { reachable: false, error: err instanceof Error ? err.message : String(err) };
   }

@@ -395,7 +395,9 @@ async def ask(
             for v in views:
                 if not any(item.title == v.lender for item in items):
                     items.append(
-                        AnswerItem(title=v.lender, text=v.describe(), deal_id=deal.id, sources=v.key_sources())
+                        AnswerItem(
+                            title=v.lender, text=v.describe(), deal_id=deal.id, sources=v.key_sources()
+                        )
                     )
 
     # 3. Build CopilotContext

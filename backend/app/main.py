@@ -10,7 +10,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from app.api.errors import install_error_handlers
-from app.api.routes import copilot, deals, emails, health
+from app.api.routes import copilot, deals, emails, gmail, health
 from app.core.config import get_settings
 from app.core.logging import RequestLoggingMiddleware, configure_logging
 from app.db.session import engine
@@ -21,11 +21,12 @@ configure_logging(settings.log_level)
 DESCRIPTION = """
 Backend for the CRE AI Deal Intelligence POC.
 
-**Email intelligence:** upload a broker/lender email; the configured extraction provider pulls out deal and
-lender-quote terms, the email is matched to a deal (or a new one is created), and every stored value keeps
-a reference to its source email and the verbatim text it came from.
 
+**Email intelligence:** upload a broker/lender email (or sync it from Gmail); the configured extraction provider
+pulls out deal and lender-quote terms, the email is matched to a deal (or a new one is created), and every stored value keeps
+a reference to its source email and the verbatim text it came from.
 **Copilot:** search and common deal questions, answered from stored data with sources.
+
 
 **Errors** use one shape, `{"detail": {"code", "message", "retryable", "email_id", "request_id"}}`,
 except FastAPI request-validation errors (422 with a list). Every response carries `X-Request-ID`.
@@ -35,6 +36,12 @@ TAGS = [
     {"name": "emails", "description": "Upload emails and read extraction results."},
     {"name": "deals", "description": "Deals, lender quotes and per-field source references."},
     {"name": "copilot", "description": "Search and question answering over deals, with sources."},
+    {
+        "name": "gmail",
+        "description": "Connect a Gmail mailbox with Google OAuth 2.0 (read-only scope), sync messages, "
+        "and process them with the email intelligence pipeline. Refresh tokens are stored encrypted; "
+        "access tokens are never stored or logged.",
+    },
     {
         "name": "health",
         "description": "Liveness and readiness (database, pgvector, migrations, provider keys).",
@@ -71,5 +78,6 @@ install_error_handlers(app)
 
 app.include_router(emails.router, prefix="/api")
 app.include_router(deals.router, prefix="/api")
+app.include_router(gmail.router, prefix="/api")
 app.include_router(copilot.router, prefix="/api")
 app.include_router(health.router, prefix="/api")

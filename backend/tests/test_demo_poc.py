@@ -60,7 +60,6 @@ def client(clean_db) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
-
 @pytest.fixture
 def seeded(client) -> dict[str, dict]:
     """Upload every demo email through the API, oldest first. Returns results by filename."""

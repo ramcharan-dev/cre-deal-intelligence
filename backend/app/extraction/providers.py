@@ -1,7 +1,7 @@
 """Chooses the extraction provider from `LLM_PROVIDER`. Business logic only sees the `Extractor` interface.
 
-Providers registered here take precedence; "claude" or "anthropic" routes to Anthropic.
-If unspecified, defaults to `FallbackExtractorRouter` (Gemini → Groq → Local fallback).
+Providers registered here take precedence. Anything else (empty, "claude", "anthropic") defers to
+`EXTRACTION_PROVIDER` via `claude.get_extractor`, which returns Claude or Ollama.
 """
 
 from collections.abc import Callable
@@ -10,8 +10,15 @@ from app.core.config import get_settings
 from app.extraction import claude
 from app.extraction.base import Extractor
 from app.extraction.demo import DemoExtractor
-from app.extraction.fallback import FallbackExtractorRouter, GeminiExtractor, GroqExtractor
+from app.extraction.fallback import FallbackExtractorRouter
 from app.extraction.local import LocalExtractor
+
+
+def _ollama() -> Extractor:
+    from app.extraction.ollama import OllamaExtractor  # imports claude, so import lazily
+
+    return OllamaExtractor()
+
 
 _PROVIDERS: dict[str, Callable[[], Extractor]] = {
     "demo": DemoExtractor,
@@ -20,6 +27,7 @@ _PROVIDERS: dict[str, Callable[[], Extractor]] = {
     "fallback": FallbackExtractorRouter,
     "gemini": lambda: FallbackExtractorRouter(primary="gemini"),
     "groq": lambda: FallbackExtractorRouter(primary="groq"),
+    "ollama": _ollama,
 }
 
 
@@ -28,8 +36,6 @@ def create_extractor(name: str | None = None) -> Extractor:
     if provider in _PROVIDERS:
         return _PROVIDERS[provider]()
     return claude.get_extractor()
-
-
 
 
 def get_extractor() -> Extractor:

@@ -36,8 +36,10 @@ cp .env.example .env        # set POSTGRES_PASSWORD; API keys optional for now
 docker compose up -d --build
 ```
 
-Host ports come from `.env` (`FRONTEND_PORT`, `BACKEND_PORT`, `POSTGRES_PORT`; defaults 3000/8000/5432).
-If you change `FRONTEND_PORT`, update `CORS_ORIGINS` to match.
+Host ports come from `.env` (`FRONTEND_PORT`, `BACKEND_PORT`, `POSTGRES_PORT`; defaults 3001/8001/5432;
+containers still listen on 3000/8000 internally). The frontend is at `http://localhost:3001` and Swagger at
+`http://localhost:8001/docs`. If you change `FRONTEND_PORT`, update `CORS_ORIGINS` and `GOOGLE_REDIRECT_URI` to match.
+Running the frontend on the host (`cd frontend && npm run dev`) also serves it on port 3001.
 
 | URL                                     | What                                             |
 | --------------------------------------- | ------------------------------------------------ |
@@ -111,6 +113,44 @@ Claude failures map to `not_configured`/`auth_failed`/`permission_denied`/`billi
 Bodies, query strings and email content are never logged, SQL parameters are hidden, configured secrets are
 redacted from every log line, and unhandled exceptions log only their type and stack frames.
 
+## Phase 3: Gmail integration
+
+`/integrations/gmail` connects a Gmail mailbox with Google OAuth 2.0 (scope `gmail.readonly` only) and feeds its
+messages into the same pipeline as uploads.
+
+1. **Connect** (`GET /api/gmail/oauth/start` → Google → `GET /api/gmail/oauth/callback`): web-server flow with PKCE
+   and offline access. `state` + PKCE verifier live in an encrypted, HttpOnly, 10-minute cookie. Only the refresh
+   token is stored, Fernet-encrypted with `TOKEN_ENCRYPTION_KEY`; access tokens are minted per request and never
+   stored or logged.
+2. **Sync** (`POST /api/gmail/sync`): lists the newest messages in a date window (default 30 days; chats, Promotions
+   and Social excluded), skips Gmail ids already stored (`gmail_messages` is unique on account + Gmail id), fetches
+   new ones as raw RFC 822, parses them with `email_parser`, and scores CRE relevance/category with keyword rules
+   (`services/gmail_relevance.py`, no AI call). Relevant messages are normalized into `emails` (status `received`).
+3. **Process** (`POST /api/gmail/messages/{id}/process`): passes the stored raw source to `ingest_email`, unchanged.
+4. **Disconnect** (`DELETE /api/gmail/connection`): revokes the token at Google and deletes the credentials and
+   message index; emails and extracted data are kept.
+
+Other endpoints: `GET /api/gmail/connection`, `GET /api/gmail/messages`, `GET /api/gmail/messages/{id}`.
+The browser reaches all of them through the frontend's `/api/gmail/*` proxy, which keeps the OAuth cookie on the
+frontend origin.
+
+**Setup**
+
+1. In Google Cloud, enable the **Gmail API** and configure the OAuth consent screen. While the app is in
+   *Testing*, add your Gmail address as a test user. Google expires refresh tokens for Testing apps after
+   7 days, after which the page asks you to reconnect.
+2. Create an OAuth client of type **Web application** with the authorized redirect URI
+   `http://localhost:3001/api/gmail/oauth/callback` (the `GOOGLE_REDIRECT_URI` in `.env.example`). If you change
+   `FRONTEND_PORT`, update both the OAuth client and `GOOGLE_REDIRECT_URI`.
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `TOKEN_ENCRYPTION_KEY` in `.env` (see `.env.example`), then
+   `docker compose up -d backend`.
+
+**Local extraction with Ollama**: set `EXTRACTION_PROVIDER=ollama` (and optionally `OLLAMA_MODEL`, default
+`qwen2.5:7b`). `extraction/ollama.py` sends the same prompt and `EmailExtraction` schema to Ollama's `/api/chat`
+with structured output; validation, matching and persistence are unchanged. Expect 1-2 minutes per email on
+a laptop. `OLLAMA_NUM_CTX` (default 16384) must fit the prompt, or Ollama silently truncates it.
+
+Tests fake Google with an `httpx.MockTransport` (`tests/test_gmail.py`), so no Google credentials are needed.
 ## POC demo (no AI model required)
 
 The POC runs end to end with the **demo extraction provider**: `DemoExtractor` (`app/extraction/demo.py`) replays
@@ -120,7 +160,8 @@ through the normal validation → matching → persistence pipeline, so every va
 
 Providers sit behind one interface: business logic uses `app.extraction.base.Extractor`, and
 `app.extraction.providers` picks the implementation from `LLM_PROVIDER` (`demo`, `fallback`, `gemini`,
-`groq`, and `claude`/`anthropic` are supported). Copilot has multi-provider fallback (Gemini → Groq → Deterministic).
+`groq`, `local`, `ollama`, and `claude`/`anthropic` are supported). Uploads and Gmail-synced emails use the same
+selection. When `LLM_PROVIDER` is empty, `claude` or `anthropic`, `EXTRACTION_PROVIDER` (`claude`/`ollama`) decides. Copilot has multi-provider fallback (Gemini → Groq → Deterministic).
 
 ```bash
 # 1. In .env set LLM_PROVIDER=demo (needed only for uploads through the UI/API), then:

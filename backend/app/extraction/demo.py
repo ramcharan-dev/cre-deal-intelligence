@@ -10,12 +10,10 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.extraction.base import ExtractionError
+from app.extraction.fallback import FallbackExtractorRouter
 from app.extraction.matching import DealCandidate
 from app.extraction.schemas import EmailExtraction
 from app.services.email_parser import ParsedEmail
-
-from app.extraction.fallback import FallbackExtractorRouter
-from app.extraction.local import LocalExtractor
 
 DEMO_DATA_DIR = Path(__file__).resolve().parents[2] / "demo_data"
 
@@ -52,4 +50,3 @@ class DemoExtractor:
         result = await self._fallback.extract(email, candidates)
         self.model = self._fallback.model
         return result
-

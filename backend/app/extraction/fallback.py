@@ -31,7 +31,9 @@ log = logging.getLogger("app.extraction.fallback")
 class GeminiExtractor:
     """Extracts structured CRE data via Google Gemini REST API."""
 
-    def __init__(self, settings: Settings | None = None, http_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, settings: Settings | None = None, http_client: httpx.AsyncClient | None = None
+    ) -> None:
         self.settings = settings or get_settings()
         self.model = self.settings.gemini_model.strip() or "gemini-2.5-flash"
         self.timeout_seconds = self.settings.gemini_timeout_seconds
@@ -49,9 +51,7 @@ class GeminiExtractor:
 
         prompt = build_user_message(email, candidates)
         payload: dict[str, Any] = {
-            "system_instruction": {
-                "parts": [{"text": SYSTEM_PROMPT}]
-            },
+            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
             "contents": [
                 {
                     "role": "user",
@@ -79,8 +79,12 @@ class GeminiExtractor:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     resp = await client.post(url, json=payload, headers=headers)
         except httpx.TimeoutException as exc:
-            log.warning("Gemini extractor model '%s' timed out after %.1fs: %s", self.model, self.timeout_seconds, exc)
-            raise ExtractionError("timeout", f"Gemini extractor timed out after {self.timeout_seconds:.1f}s: {exc}") from exc
+            log.warning(
+                "Gemini extractor model '%s' timed out after %.1fs: %s", self.model, self.timeout_seconds, exc
+            )
+            raise ExtractionError(
+                "timeout", f"Gemini extractor timed out after {self.timeout_seconds:.1f}s: {exc}"
+            ) from exc
         except httpx.RequestError as exc:
             log.warning("Gemini extractor model '%s' connection error: %s", self.model, exc)
             raise ExtractionError("connection_error", f"Gemini connection error: {exc}") from exc
@@ -93,7 +97,9 @@ class GeminiExtractor:
             if status_code == 429:
                 raise ExtractionError("rate_limited", f"Gemini quota exceeded (HTTP 429): {exc}") from exc
             if status_code in (401, 403):
-                raise ExtractionError("auth_failed", f"Gemini authentication failed (HTTP {status_code}): {exc}") from exc
+                raise ExtractionError(
+                    "auth_failed", f"Gemini authentication failed (HTTP {status_code}): {exc}"
+                ) from exc
             raise ExtractionError("upstream_error", f"Gemini returned HTTP {status_code}: {exc}") from exc
 
         try:
@@ -106,13 +112,17 @@ class GeminiExtractor:
         except ExtractionError:
             raise
         except (KeyError, IndexError, pydantic.ValidationError, ValueError, json.JSONDecodeError) as exc:
-            raise ExtractionError("invalid_output", f"Gemini response did not match extraction schema: {exc}") from exc
+            raise ExtractionError(
+                "invalid_output", f"Gemini response did not match extraction schema: {exc}"
+            ) from exc
 
 
 class GroqExtractor:
     """Extracts structured CRE data via Groq OpenAI-compatible REST API."""
 
-    def __init__(self, settings: Settings | None = None, http_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, settings: Settings | None = None, http_client: httpx.AsyncClient | None = None
+    ) -> None:
         self.settings = settings or get_settings()
         self.model = self.settings.groq_model.strip() or "llama-3.3-70b-versatile"
         self.timeout_seconds = self.settings.groq_timeout_seconds
@@ -133,7 +143,11 @@ class GroqExtractor:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT + "\nRespond with valid JSON adhering to the EmailExtraction schema."},
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT
+                    + "\nRespond with valid JSON adhering to the EmailExtraction schema.",
+                },
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.1,
@@ -154,8 +168,12 @@ class GroqExtractor:
                 async with httpx.AsyncClient(timeout=timeout) as client:
                     resp = await client.post(url, json=payload, headers=headers)
         except httpx.TimeoutException as exc:
-            log.warning("Groq extractor model '%s' timed out after %.1fs: %s", self.model, self.timeout_seconds, exc)
-            raise ExtractionError("timeout", f"Groq extractor timed out after {self.timeout_seconds:.1f}s: {exc}") from exc
+            log.warning(
+                "Groq extractor model '%s' timed out after %.1fs: %s", self.model, self.timeout_seconds, exc
+            )
+            raise ExtractionError(
+                "timeout", f"Groq extractor timed out after {self.timeout_seconds:.1f}s: {exc}"
+            ) from exc
         except httpx.RequestError as exc:
             log.warning("Groq extractor model '%s' connection error: %s", self.model, exc)
             raise ExtractionError("connection_error", f"Groq connection error: {exc}") from exc
@@ -168,7 +186,9 @@ class GroqExtractor:
             if status_code == 429:
                 raise ExtractionError("rate_limited", f"Groq quota exceeded (HTTP 429): {exc}") from exc
             if status_code in (401, 403):
-                raise ExtractionError("auth_failed", f"Groq authentication failed (HTTP {status_code}): {exc}") from exc
+                raise ExtractionError(
+                    "auth_failed", f"Groq authentication failed (HTTP {status_code}): {exc}"
+                ) from exc
             raise ExtractionError("upstream_error", f"Groq returned HTTP {status_code}: {exc}") from exc
 
         try:
@@ -181,7 +201,9 @@ class GroqExtractor:
         except ExtractionError:
             raise
         except (KeyError, IndexError, pydantic.ValidationError, ValueError, json.JSONDecodeError) as exc:
-            raise ExtractionError("invalid_output", f"Groq response did not match extraction schema: {exc}") from exc
+            raise ExtractionError(
+                "invalid_output", f"Groq response did not match extraction schema: {exc}"
+            ) from exc
 
 
 class FallbackExtractorRouter:
@@ -201,12 +223,20 @@ class FallbackExtractorRouter:
         self.model = "fallback-router"
 
     async def extract(self, email: ParsedEmail, candidates: list[DealCandidate]) -> EmailExtraction:
-        providers = [("gemini", self.gemini), ("groq", self.groq)] if self.primary != "groq" else [("groq", self.groq)]
+        providers = (
+            [("gemini", self.gemini), ("groq", self.groq)]
+            if self.primary != "groq"
+            else [("groq", self.groq)]
+        )
 
         for name, provider in providers:
             if provider.is_configured():
                 try:
-                    log.info("Attempting email extraction with %s (model=%s)", name.capitalize(), getattr(provider, "model", name))
+                    log.info(
+                        "Attempting email extraction with %s (model=%s)",
+                        name.capitalize(),
+                        getattr(provider, "model", name),
+                    )
                     result = await provider.extract(email, candidates)
                     self.model = getattr(provider, "model", name)
                     return result

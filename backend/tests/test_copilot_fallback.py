@@ -16,8 +16,6 @@ Covers all 11 required scenarios:
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
-from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -27,10 +25,6 @@ from app.api.schemas import AnswerItem, CopilotAnswer, SourceRef
 from app.core.config import Settings
 from app.services.copilot_providers import (
     CopilotContext,
-    DeterministicCopilotProvider,
-    FallbackCopilotRouter,
-    GeminiCopilotProvider,
-    GroqCopilotProvider,
     create_copilot_router,
 )
 

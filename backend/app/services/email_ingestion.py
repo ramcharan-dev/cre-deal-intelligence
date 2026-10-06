@@ -19,7 +19,13 @@ from app.api.schemas import (
 from app.extraction.claude import ExtractionError, Extractor
 from app.extraction.fields import DEAL_FIELD_SPECS, QUOTE_FIELD_SPECS, FieldSpec
 from app.extraction.matching import DealCandidate, DealResolution, normalize_name, resolve_deal
-from app.extraction.schemas import EmailType, TypedValue, ValidatedExtraction, ValidatedField, ValidatedLenderQuote
+from app.extraction.schemas import (
+    EmailType,
+    TypedValue,
+    ValidatedExtraction,
+    ValidatedField,
+    ValidatedLenderQuote,
+)
 from app.extraction.validation import validate_extraction
 from app.models import Deal, Email, ExtractedValue, Lender, Quote
 from app.services.email_parser import ParsedEmail, parse_email

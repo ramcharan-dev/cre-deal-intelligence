@@ -9,8 +9,7 @@ without requiring an external LLM or API keys.
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime
-from typing import TYPE_CHECKING
+from datetime import date
 
 from app.extraction.fields import DEAL_FIELD_SPECS, QUOTE_FIELD_SPECS
 from app.extraction.matching import DealCandidate, normalize_name
@@ -26,10 +25,29 @@ from app.extraction.schemas import (
 from app.services.email_parser import ParsedEmail
 
 _MONTH_MAP = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-    "january": 1, "february": 2, "march": 3, "april": 4, "june": 6,
-    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
 }
 
 _PROPERTY_TYPE_KEYWORDS: list[tuple[str, str]] = [
@@ -56,11 +74,57 @@ _TRANSACTION_TYPE_KEYWORDS: list[tuple[str, str]] = [
 ]
 
 _US_STATES = {
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
+    "DC",
 }
 
 _QUOTED_REPLY_RE = re.compile(
@@ -180,16 +244,28 @@ class LocalExtractor:
         # 1. If valid quotes with quote fields were extracted
         if quotes:
             has_financial_terms = any(
-                any(f.field in {
-                    "loan_amount", "interest_rate", "rate_type", "spread_bps",
-                    "ltv", "ltc", "term_months", "amortization_months",
-                    "interest_only_months", "min_dscr", "origination_fee_pct", "recourse"
-                } for f in q.fields)
+                any(
+                    f.field
+                    in {
+                        "loan_amount",
+                        "interest_rate",
+                        "rate_type",
+                        "spread_bps",
+                        "ltv",
+                        "ltc",
+                        "term_months",
+                        "amortization_months",
+                        "interest_only_months",
+                        "min_dscr",
+                        "origination_fee_pct",
+                        "recourse",
+                    }
+                    for f in q.fields
+                )
                 for q in quotes
             )
             has_decline = any(
-                any(f.field == "quote_status" and f.value == "declined" for f in q.fields)
-                for q in quotes
+                any(f.field == "quote_status" and f.value == "declined" for f in q.fields) for q in quotes
             )
             if has_financial_terms or has_decline:
                 return "lender_quote"
@@ -224,9 +300,7 @@ class LocalExtractor:
 
         return "other"
 
-    def _match_candidate(
-        self, subject: str, body: str, candidates: list[DealCandidate]
-    ) -> DealMatch:
+    def _match_candidate(self, subject: str, body: str, candidates: list[DealCandidate]) -> DealMatch:
         combo = f"{subject}\n{body}"
         norm_combo = normalize_name(combo)
 
@@ -276,7 +350,10 @@ class LocalExtractor:
 
         # Subject line extraction (e.g. "New refi mandate - The Lofts at Riverbend (Sacramento MF) - $50MM")
         if "deal_name" not in seen_fields:
-            m_subj = re.search(r"(?i)(?:mandate|financing|refi|acquisition|closed|update)\s*[-–:]\s*([A-Za-z0-9\s'&]+?)(?:\s*\([^)]*\)|\s*[-–:]|\s*\$\d|\n|$)", subject)
+            m_subj = re.search(
+                r"(?i)(?:mandate|financing|refi|acquisition|closed|update)\s*[-–:]\s*([A-Za-z0-9\s'&]+?)(?:\s*\([^)]*\)|\s*[-–:]|\s*\$\d|\n|$)",
+                subject,
+            )
             if m_subj:
                 name_cand = m_subj.group(1).strip()
                 if len(name_cand) > 3:
@@ -285,7 +362,10 @@ class LocalExtractor:
 
         # Fallback to Named Buildings pattern: "The Lofts at Riverbend", "Mesa Logistics Center"
         if "deal_name" not in seen_fields:
-            m_entity = re.search(r"\b((?:The\s+)?[A-Z][a-zA-Z0-9\s&']+(?:Apartments|Lofts|Center|Building|Commons|Park|Plaza|Village|Heights|Towers?|Estates?|Offices?))\b", text)
+            m_entity = re.search(
+                r"\b((?:The\s+)?[A-Z][a-zA-Z0-9\s&']+(?:Apartments|Lofts|Center|Building|Commons|Park|Plaza|Village|Heights|Towers?|Estates?|Offices?))\b",
+                text,
+            )
             if m_entity:
                 name_cand = m_entity.group(1).strip()
                 add_field("deal_name", name_cand, m_entity.group(0))
@@ -306,7 +386,10 @@ class LocalExtractor:
                     add_field("city", parts[-2].strip(), parts[-2])
         else:
             # Inline address search: e.g. "1850 Riverside Drive, Sacramento, CA"
-            m_street = re.search(r"\b(\d{1,5}\s+[A-Z][A-Za-z0-9\s.,]+?(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Way|Lane|Ln|Court|Ct|Parkway|Pkwy))\b", text)
+            m_street = re.search(
+                r"\b(\d{1,5}\s+[A-Z][A-Za-z0-9\s.,]+?(?:Street|St|Avenue|Ave|Boulevard|Blvd|Road|Rd|Drive|Dr|Way|Lane|Ln|Court|Ct|Parkway|Pkwy))\b",
+                text,
+            )
             if m_street:
                 add_field("property_address", m_street.group(1).strip(), m_street.group(0))
 
@@ -330,7 +413,10 @@ class LocalExtractor:
                 break
 
         # 5. Loan Amount Requested
-        m_req = re.search(r"(?i)\b(?:loan\s*(?:amount|request|size)|seeking|requesting)\s*[:–-]?\s*(\$[\d,.]+\s*(?:mm|m|million|b|k)?)\b", text)
+        m_req = re.search(
+            r"(?i)\b(?:loan\s*(?:amount|request|size)|seeking|requesting)\s*[:–-]?\s*(\$[\d,.]+\s*(?:mm|m|million|b|k)?)\b",
+            text,
+        )
         if m_req:
             add_field("loan_amount_requested", m_req.group(1).strip(), m_req.group(0))
         else:
@@ -340,11 +426,17 @@ class LocalExtractor:
                 add_field("loan_amount_requested", m_subj_amt.group(1).strip(), m_subj_amt.group(0))
 
         # 6. Purchase Price & Property Value
-        m_price = re.search(r"(?i)\b(?:purchase\s*price|acquisition\s*price)\s*[:–-]?\s*(\$[\d,.]+\s*(?:mm|m|million)?)\b", text)
+        m_price = re.search(
+            r"(?i)\b(?:purchase\s*price|acquisition\s*price)\s*[:–-]?\s*(\$[\d,.]+\s*(?:mm|m|million)?)\b",
+            text,
+        )
         if m_price:
             add_field("purchase_price", m_price.group(1).strip(), m_price.group(0))
 
-        m_val = re.search(r"(?i)\b(?:property\s*value|appraised\s*value|as-is\s*value|valuation)\s*[:–-]?\s*(\$[\d,.]+\s*(?:mm|m|million)?)\b", text)
+        m_val = re.search(
+            r"(?i)\b(?:property\s*value|appraised\s*value|as-is\s*value|valuation)\s*[:–-]?\s*(\$[\d,.]+\s*(?:mm|m|million)?)\b",
+            text,
+        )
         if m_val:
             add_field("property_value", m_val.group(1).strip(), m_val.group(0))
 
@@ -366,14 +458,20 @@ class LocalExtractor:
             add_field("occupancy_pct", m_occ.group(1).rstrip("%"), m_occ.group(0))
 
         # 8. Target Closing Date
-        m_close = re.search(r"(?i)\b(?:target\s*closing(?:\s*date)?|closing\s*date|targeting\s*closing\s*(?:on)?)\s*[:–-]?\s*([^\n\r,.]{5,30})", text)
+        m_close = re.search(
+            r"(?i)\b(?:target\s*closing(?:\s*date)?|closing\s*date|targeting\s*closing\s*(?:on)?)\s*[:–-]?\s*([^\n\r,.]{5,30})",
+            text,
+        )
         if m_close:
             parsed_d = _parse_date_string(m_close.group(1).strip())
             if parsed_d:
                 add_field("target_closing_date", parsed_d, m_close.group(0))
 
         # 9. Sponsor Name
-        m_spons = re.search(r"(?i)\b(?:sponsor|borrower)\s*[:–-]\s*([A-Z][A-Za-z0-9\s&,.'-]+?(?:Partners|Capital|LLC|Group|Holdings|Properties|Fund|LP|Corp|Development))", text)
+        m_spons = re.search(
+            r"(?i)\b(?:sponsor|borrower)\s*[:–-]\s*([A-Z][A-Za-z0-9\s&,.'-]+?(?:Partners|Capital|LLC|Group|Holdings|Properties|Fund|LP|Corp|Development))",
+            text,
+        )
         if m_spons:
             add_field("sponsor_name", m_spons.group(1).strip(), m_spons.group(0))
 
@@ -420,7 +518,10 @@ class LocalExtractor:
         if not known_lenders and email.sender:
             sender_name = email.sender.name or ""
             domain = email.sender.email.split("@")[-1].lower() if "@" in email.sender.email else ""
-            if any(k in sender_name.lower() or k in domain for k in ("bank", "lending", "capital", "partners", "credit", "finance", "funding")):
+            if any(
+                k in sender_name.lower() or k in domain
+                for k in ("bank", "lending", "capital", "partners", "credit", "finance", "funding")
+            ):
                 lender_display = sender_name or domain.split(".")[0].title()
                 src = sender_name if sender_name and sender_name in text else email.sender.email
                 if src in text and normalize_name(lender_display) not in excluded_names:
@@ -430,12 +531,19 @@ class LocalExtractor:
         if not known_lenders:
             # Check if there is a generic decline or proposal
             if re.search(r"\b(term\s*sheet|proposal)\b", text, re.IGNORECASE) or decline_match:
-                m_inst = re.search(r"\b([A-Z][A-Za-z0-9&'.-]{2,30}(?:\s+[A-Za-z0-9&'.-]+)?\s+(?:Bank|Lenders?|Capital|Partners|Finance|Funding))\b", text)
+                m_inst = re.search(
+                    r"\b([A-Z][A-Za-z0-9&'.-]{2,30}(?:\s+[A-Za-z0-9&'.-]+)?\s+(?:Bank|Lenders?|Capital|Partners|Finance|Funding))\b",
+                    text,
+                )
                 if m_inst and normalize_name(m_inst.group(1).strip()) not in excluded_names:
                     known_lenders.append((m_inst.group(1).strip(), m_inst.group(0)))
                 elif email.sender:
                     s_name = email.sender.name or email.sender.email.split("@")[0].replace(".", " ").title()
-                    src = email.sender.name if email.sender.name and email.sender.name in text else email.sender.email
+                    src = (
+                        email.sender.name
+                        if email.sender.name and email.sender.name in text
+                        else email.sender.email
+                    )
                     if normalize_name(s_name) not in excluded_names:
                         known_lenders.append((s_name, src))
 
@@ -443,10 +551,16 @@ class LocalExtractor:
             quote_fields: list[QuoteFieldExtraction] = []
             seen_qfields: set[str] = set()
 
-            def add_qfield(field_name: str, value: str, source_text: str):
-                if field_name not in seen_qfields and source_text in text and field_name in QUOTE_FIELD_SPECS:
-                    seen_qfields.add(field_name)
-                    quote_fields.append(QuoteFieldExtraction(field=field_name, value=value, source_text=source_text))
+            def add_qfield(
+                field_name: str,
+                value: str,
+                source_text: str,
+                seen: set[str] = seen_qfields,
+                out: list[QuoteFieldExtraction] = quote_fields,
+            ):
+                if field_name not in seen and source_text in text and field_name in QUOTE_FIELD_SPECS:
+                    seen.add(field_name)
+                    out.append(QuoteFieldExtraction(field=field_name, value=value, source_text=source_text))
 
             # Quote Status: declined vs term_sheet vs indicative
             if decline_match:
@@ -456,12 +570,19 @@ class LocalExtractor:
                 if m_ts:
                     add_qfield("quote_status", "term_sheet", m_ts.group(0))
             else:
-                m_ind = re.search(r"\b(?:indicative(?:\s*financing)?(?:\s*terms?)?|(?:loan|financing)\s*proposal|quote\s*summary)\b", text, re.IGNORECASE)
+                m_ind = re.search(
+                    r"\b(?:indicative(?:\s*financing)?(?:\s*terms?)?|(?:loan|financing)\s*proposal|quote\s*summary)\b",
+                    text,
+                    re.IGNORECASE,
+                )
                 if m_ind:
                     add_qfield("quote_status", "indicative", m_ind.group(0))
 
             # Loan Amount
-            m_lamt = re.search(r"(?i)\b(?:loan\s*amount|max\s*loan|proceeds)\s*[:–-]?\s*(\$[\d,.]+(?:\s*(?:mm|m|million|b|k))?)", text)
+            m_lamt = re.search(
+                r"(?i)\b(?:loan\s*amount|max\s*loan|proceeds)\s*[:–-]?\s*(\$[\d,.]+(?:\s*(?:mm|m|million|b|k))?)",
+                text,
+            )
             if m_lamt:
                 add_qfield("loan_amount", m_lamt.group(1).strip(), m_lamt.group(0))
 
@@ -483,34 +604,56 @@ class LocalExtractor:
                 add_qfield("rate_type", "floating", m_floating.group(0))
 
             # Spread (bps)
-            m_spread = re.search(r"\b(?:\+|spread\s*of\s*|spread\s*[:–-]?\s*)(\d{2,4})\s*(?:bps|basis\s*points)\b", text, re.IGNORECASE)
+            m_spread = re.search(
+                r"\b(?:\+|spread\s*of\s*|spread\s*[:–-]?\s*)(\d{2,4})\s*(?:bps|basis\s*points)\b",
+                text,
+                re.IGNORECASE,
+            )
             if m_spread:
                 add_qfield("spread_bps", m_spread.group(1), m_spread.group(0))
 
             # Index
-            m_index = re.search(r"\b(1M\s*Term\s*SOFR|SOFR|5Y\s*UST|10Y\s*UST|UST|Treasury)\b", text, re.IGNORECASE)
+            m_index = re.search(
+                r"\b(1M\s*Term\s*SOFR|SOFR|5Y\s*UST|10Y\s*UST|UST|Treasury)\b", text, re.IGNORECASE
+            )
             if m_index:
                 add_qfield("index_name", m_index.group(1).strip(), m_index.group(0))
 
             # Term (months)
             m_term = re.search(r"(?i)\bterm\s*[:–-]?[ \t]*(\d{1,2})[ \t]*(?:year|yr)s?", text)
             if not m_term:
-                m_term = re.search(r"\b(\d{1,2})[ \t]*(?:-|–|[ \t]+)(?:year|yr)s?\b(?![ \t]*amortization)", text, re.IGNORECASE)
+                m_term = re.search(
+                    r"\b(\d{1,2})[ \t]*(?:-|–|[ \t]+)(?:year|yr)s?\b(?![ \t]*amortization)",
+                    text,
+                    re.IGNORECASE,
+                )
             if m_term:
                 years = int(m_term.group(1))
                 add_qfield("term_months", str(years * 12), m_term.group(0))
 
             # Amortization (months)
-            m_amort = re.search(r"(?i)\b(?:amortization|amort)\s*[:–-]?[ \t]*(\d{1,2})[ \t]*(?:year|yr)s?", text)
+            m_amort = re.search(
+                r"(?i)\b(?:amortization|amort)\s*[:–-]?[ \t]*(\d{1,2})[ \t]*(?:year|yr)s?", text
+            )
             if not m_amort:
-                m_amort = re.search(r"\b(\d{1,2})[ \t]*(?:-|–|[ \t]+)(?:year|yr)s?[ \t]+(?:amortization|amort)\b", text, re.IGNORECASE)
+                m_amort = re.search(
+                    r"\b(\d{1,2})[ \t]*(?:-|–|[ \t]+)(?:year|yr)s?[ \t]+(?:amortization|amort)\b",
+                    text,
+                    re.IGNORECASE,
+                )
             if m_amort:
                 add_qfield("amortization_months", str(int(m_amort.group(1)) * 12), m_amort.group(0))
 
             # Interest-only (months)
-            m_io = re.search(r"(?i)\b(?:io|interest[- ]only)\s*[:–-]?[ \t]*(\d{1,2})[ \t]*(?:year|yr)s?", text)
+            m_io = re.search(
+                r"(?i)\b(?:io|interest[- ]only)\s*[:–-]?[ \t]*(\d{1,2})[ \t]*(?:year|yr)s?", text
+            )
             if not m_io:
-                m_io = re.search(r"\b(\d{1,2})[ \t]*(?:-|–|[ \t]+)(?:year|yr)s?[ \t]+(?:io|interest-only|interest[ \t]+only)\b", text, re.IGNORECASE)
+                m_io = re.search(
+                    r"\b(\d{1,2})[ \t]*(?:-|–|[ \t]+)(?:year|yr)s?[ \t]+(?:io|interest-only|interest[ \t]+only)\b",
+                    text,
+                    re.IGNORECASE,
+                )
             if m_io:
                 add_qfield("interest_only_months", str(int(m_io.group(1)) * 12), m_io.group(0))
 
@@ -520,7 +663,6 @@ class LocalExtractor:
                 m_ltv = re.search(r"\b(\d{1,2}(?:\.\d+)?%?)\s*ltv\b", text, re.IGNORECASE)
             if m_ltv:
                 add_qfield("ltv", m_ltv.group(1).rstrip("%").strip(), m_ltv.group(0))
-
 
             # Min DSCR
             m_dscr = re.search(r"(?i)\b(?:min\s*dscr|dscr)\s*[:–-]?\s*(\d(?:\.\d+)?x?)\b", text)
@@ -553,11 +695,24 @@ class LocalExtractor:
             if email.sender and email.sender.name and email.sender.name in text:
                 contact_name = SourcedText(value=email.sender.name, source_text=email.sender.name)
 
-            has_financial_terms = any(f.field in {
-                "loan_amount", "interest_rate", "rate_type", "spread_bps",
-                "ltv", "ltc", "term_months", "amortization_months",
-                "interest_only_months", "min_dscr", "origination_fee_pct", "recourse"
-            } for f in quote_fields)
+            has_financial_terms = any(
+                f.field
+                in {
+                    "loan_amount",
+                    "interest_rate",
+                    "rate_type",
+                    "spread_bps",
+                    "ltv",
+                    "ltc",
+                    "term_months",
+                    "amortization_months",
+                    "interest_only_months",
+                    "min_dscr",
+                    "origination_fee_pct",
+                    "recourse",
+                }
+                for f in quote_fields
+            )
             is_decline = any(f.field == "quote_status" and f.value == "declined" for f in quote_fields)
 
             if is_decline or has_financial_terms:
@@ -590,8 +745,14 @@ class LocalExtractor:
             return f"Deal financing submission for {name}."
 
         if email_type == "lender_quote":
-            lenders = ", ".join(q.lender_name.value for q in quotes if q.lender_name and q.lender_name.value) if quotes else "Lender"
-            has_decline = any(any(f.field == "quote_status" and f.value == "declined" for f in q.fields) for q in quotes)
+            lenders = (
+                ", ".join(q.lender_name.value for q in quotes if q.lender_name and q.lender_name.value)
+                if quotes
+                else "Lender"
+            )
+            has_decline = any(
+                any(f.field == "quote_status" and f.value == "declined" for f in q.fields) for q in quotes
+            )
             if has_decline:
                 return f"{lenders} declined financing on {name}."
             return f"Lender financing quote and terms from {lenders} for {name}."

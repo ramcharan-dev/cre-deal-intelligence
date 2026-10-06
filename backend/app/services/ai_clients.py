@@ -53,22 +53,44 @@ def get_cohere() -> cohere.AsyncClientV2:
 def provider_status() -> dict[str, dict[str, str | bool]]:
     """Which providers have credentials configured (no network calls)."""
     s = get_settings()
-    active_provider = s.llm_provider.lower().strip() or "fallback"
+
+    # Mirrors app.extraction.providers.create_extractor: LLM_PROVIDER wins unless it is empty/claude/anthropic,
+    # in which case EXTRACTION_PROVIDER (claude | ollama) decides.
+    primary = s.llm_provider.lower().strip()
+    extraction = s.extraction_provider if primary in ("", "claude", "anthropic") else primary
+    gemini_chain = extraction in ("gemini", "fallback")
+
     return {
         "gemini": {
             "configured": _configured(s.gemini_api_key),
             "model": s.gemini_model,
-            "used_by": "email extraction & copilot" if active_provider in ("gemini", "fallback") else "copilot",
+            "used_by": "email extraction & copilot" if gemini_chain else "copilot",
         },
         "groq": {
             "configured": _configured(s.groq_api_key),
             "model": s.groq_model,
-            "used_by": "email extraction & copilot" if active_provider == "groq" else "email extraction fallback & copilot fallback",
+            "used_by": (
+                "email extraction & copilot"
+                if extraction == "groq"
+                else "email extraction fallback & copilot"
+                if gemini_chain
+                else "copilot"
+            ),
         },
         "anthropic": {
             "configured": _configured(s.anthropic_api_key),
-            "model": s.llm_model if (active_provider in ("anthropic", "claude") and s.llm_model.strip()) else s.anthropic_model,
-            "used_by": "email extraction" if active_provider in ("anthropic", "claude") else "inactive",
+            "model": s.llm_model.strip() or s.anthropic_model,
+            "used_by": "email extraction"
+            if extraction == "claude"
+            else f"not used (extraction: {extraction})",
+        },
+        "ollama": {
+            "configured": extraction
+            == "ollama",  # no key; reachability is checked when an email is processed
+            "model": s.ollama_model,
+            "used_by": "email extraction"
+            if extraction == "ollama"
+            else f"not used (extraction: {extraction})",
         },
         "voyage": {
             "configured": _configured(s.voyage_api_key),

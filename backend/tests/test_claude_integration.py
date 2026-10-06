@@ -13,7 +13,8 @@ from fastapi.testclient import TestClient
 
 from app.api.errors import EXTRACTION_STATUS
 from app.core.config import get_settings
-from app.extraction.claude import ClaudeExtractor, ExtractionError, get_extractor, map_provider_error
+from app.extraction.claude import ClaudeExtractor, ExtractionError, map_provider_error
+from app.extraction.providers import get_extractor
 from app.extraction.schemas import EmailExtraction
 from app.main import app
 from app.services import ai_clients

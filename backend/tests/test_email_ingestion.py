@@ -5,8 +5,9 @@ from collections.abc import Callable, Iterator
 import pytest
 from fastapi.testclient import TestClient
 
-from app.extraction.claude import ExtractionError, get_extractor
+from app.extraction.claude import ExtractionError
 from app.extraction.matching import DealCandidate
+from app.extraction.providers import get_extractor
 from app.extraction.schemas import EmailExtraction
 from app.main import app
 from app.services.email_parser import ParsedEmail

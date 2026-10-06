@@ -8,8 +8,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.crypto import CryptoNotConfiguredError
 from app.core.logging import request_id_var
 from app.extraction.claude import ErrorCode
+from app.services.google_client import GmailError, GmailErrorCode
 
 
 class ErrorDetail(BaseModel):
@@ -52,9 +54,26 @@ EXTRACTION_STATUS: dict[ErrorCode, int] = {
 }
 
 
-def error_responses(*codes: int) -> dict[int | str, dict[str, Any]]:
-    """OpenAPI `responses=` entries for the given status codes."""
-    descriptions = {
+# How Gmail/Google failures surface over HTTP.
+GMAIL_STATUS: dict[GmailErrorCode, int] = {
+    "gmail_not_configured": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "gmail_not_connected": status.HTTP_409_CONFLICT,
+    "gmail_reauth_required": status.HTTP_409_CONFLICT,
+    "gmail_permission_denied": status.HTTP_503_SERVICE_UNAVAILABLE,
+    "gmail_rate_limited": status.HTTP_429_TOO_MANY_REQUESTS,
+    "gmail_upstream_error": status.HTTP_502_BAD_GATEWAY,
+    "gmail_unreachable": status.HTTP_502_BAD_GATEWAY,
+    "gmail_timeout": status.HTTP_504_GATEWAY_TIMEOUT,
+    "oauth_failed": status.HTTP_502_BAD_GATEWAY,
+}
+
+
+def error_responses(*codes: int, **descriptions: str) -> dict[int | str, dict[str, Any]]:
+    """OpenAPI `responses=` entries for the given status codes.
+
+    Override a default description with a keyword argument named after the code, e.g. `d409="..."`.
+    """
+    default = {
         400: "The upload is not a parseable email",
         404: "Not found",
         409: "The email exists but has no extraction result (still processing or failed)",
@@ -65,7 +84,9 @@ def error_responses(*codes: int) -> dict[int | str, dict[str, Any]]:
         503: "Claude not configured, key rejected, out of credits, or overloaded (see `code`)",
         504: "Claude timed out (retryable)",
     }
-    return {c: {"model": ErrorResponse, "description": descriptions[c]} for c in codes}
+    return {
+        c: {"model": ErrorResponse, "description": descriptions.get(f"d{c}") or default[c]} for c in codes
+    }
 
 
 def install_error_handlers(app: FastAPI) -> None:
@@ -78,3 +99,13 @@ def install_error_handlers(app: FastAPI) -> None:
         )
         body = ErrorResponse(detail=ErrorDetail(**detail, request_id=request_id_var.get()))
         return JSONResponse(body.model_dump(mode="json"), status_code=exc.status_code, headers=exc.headers)
+
+    @app.exception_handler(GmailError)
+    async def gmail_error(request: Request, exc: GmailError) -> JSONResponse:
+        api = ApiError(GMAIL_STATUS[exc.code], exc.code, exc.message, retryable=exc.retryable)
+        return await http_error(request, api)
+
+    @app.exception_handler(CryptoNotConfiguredError)
+    async def crypto_error(request: Request, exc: CryptoNotConfiguredError) -> JSONResponse:
+        api = ApiError(status.HTTP_503_SERVICE_UNAVAILABLE, "gmail_not_configured", str(exc))
+        return await http_error(request, api)

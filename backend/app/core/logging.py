@@ -18,8 +18,12 @@ from app.core.config import get_settings
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
-# Provider key shapes, as a backstop for keys that are not in settings (e.g. echoed by an upstream error).
-_KEY_PATTERNS = re.compile(r"sk-ant-[A-Za-z0-9_\-]{8,}|pa-[A-Za-z0-9_\-]{20,}|Bearer\s+[A-Za-z0-9._\-]{12,}")
+# Provider key and Google OAuth token shapes (access token, refresh token, auth code, client secret), as a
+# backstop for credentials that are not in settings (e.g. echoed by an upstream error).
+_KEY_PATTERNS = re.compile(
+    r"sk-ant-[A-Za-z0-9_\-]{8,}|pa-[A-Za-z0-9_\-]{20,}|Bearer\s+[A-Za-z0-9._\-]{12,}"
+    r"|ya29\.[A-Za-z0-9._\-]{10,}|1//[A-Za-z0-9_\-]{20,}|4/[0-9A-Za-z_\-]{20,}|GOCSPX-[A-Za-z0-9_\-]{10,}"
+)
 REDACTED = "[REDACTED]"
 
 

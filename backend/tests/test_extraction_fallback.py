@@ -28,29 +28,9 @@ MOCK_EXTRACTION_DICT = {
 
 MOCK_EXTRACTION = EmailExtraction.model_validate(MOCK_EXTRACTION_DICT)
 
-MOCK_GEMINI_SUCCESS = {
-    "candidates": [
-        {
-            "content": {
-                "parts": [
-                    {
-                        "text": json.dumps(MOCK_EXTRACTION_DICT)
-                    }
-                ]
-            }
-        }
-    ]
-}
+MOCK_GEMINI_SUCCESS = {"candidates": [{"content": {"parts": [{"text": json.dumps(MOCK_EXTRACTION_DICT)}]}}]}
 
-MOCK_GROQ_SUCCESS = {
-    "choices": [
-        {
-            "message": {
-                "content": json.dumps(MOCK_EXTRACTION_DICT)
-            }
-        }
-    ]
-}
+MOCK_GROQ_SUCCESS = {"choices": [{"message": {"content": json.dumps(MOCK_EXTRACTION_DICT)}}]}
 
 SAMPLE_EMAIL_BYTES = (
     b"From: broker@capital.com\r\n"
@@ -81,11 +61,13 @@ def candidates():
     return [DealCandidate(id="deal-1", deal_name="The Oaks")]
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_case_1_gemini_succeeds(parsed_email, candidates):
     """Case 1 — Gemini succeeds → extraction returned with gemini model."""
     settings = _make_settings()
-    mock_resp = httpx.Response(200, json=MOCK_GEMINI_SUCCESS, request=httpx.Request("POST", "https://api.fake"))
+    mock_resp = httpx.Response(
+        200, json=MOCK_GEMINI_SUCCESS, request=httpx.Request("POST", "https://api.fake")
+    )
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp) as mock_post:
         router = FallbackExtractorRouter(
@@ -101,7 +83,7 @@ async def test_case_1_gemini_succeeds(parsed_email, candidates):
         assert "gemini-2.5-flash:generateContent" in str(mock_post.call_args)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_case_2_gemini_fails_quota_groq_succeeds(parsed_email, candidates):
     """Case 2 — Gemini fails with 429 quota → immediately tries Groq → returns Groq extraction."""
     settings = _make_settings()
@@ -137,7 +119,7 @@ async def test_case_2_gemini_fails_quota_groq_succeeds(parsed_email, candidates)
         assert post_mock.call_count == 2
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_case_3_gemini_and_groq_fail_deterministic_fallback(parsed_email, candidates):
     """Case 3 — Gemini and Groq fail → falls back to deterministic extraction."""
     settings = _make_settings()
@@ -171,7 +153,7 @@ async def test_case_3_gemini_and_groq_fail_deterministic_fallback(parsed_email, 
         assert isinstance(res, EmailExtraction)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_case_4_gemini_timeout_handled_groq_succeeds(parsed_email, candidates):
     """Case 4 — Gemini ReadTimeout is caught and handled, immediately continuing to Groq."""
     settings = _make_settings()
@@ -201,7 +183,7 @@ async def test_case_4_gemini_timeout_handled_groq_succeeds(parsed_email, candida
         assert post_mock.call_count == 2
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_case_4b_groq_timeout_handled_deterministic_succeeds(parsed_email, candidates):
     """Case 4b — Both Gemini and Groq time out → deterministic fallback succeeds, no unhandled ReadTimeout."""
     settings = _make_settings()
@@ -243,6 +225,7 @@ def test_create_extractor_wiring():
 def test_api_emails_gemini_fails_groq_succeeds(clean_db):
     """Integration test: POST /api/emails when Gemini 429s, Groq succeeds -> HTTP 200."""
     from starlette.testclient import TestClient
+
     from app.main import app
 
     gemini_resp_429 = httpx.Response(
@@ -287,6 +270,7 @@ def test_api_emails_gemini_fails_groq_succeeds(clean_db):
 def test_api_emails_gemini_and_groq_timeout_deterministic_succeeds(clean_db):
     """Integration test: POST /api/emails when both Gemini & Groq timeout -> LocalExtractor -> HTTP 200."""
     from starlette.testclient import TestClient
+
     from app.main import app
 
     async def mock_post(url, **kwargs):
@@ -311,4 +295,3 @@ def test_api_emails_gemini_and_groq_timeout_deterministic_succeeds(clean_db):
                         body = resp.json()
                         assert body["model"] == "local-fallback"
                         assert body["deal"]["created"] is True
-

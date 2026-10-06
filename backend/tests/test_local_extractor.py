@@ -56,7 +56,11 @@ def test_extract_lender_quote() -> None:
     extraction = asyncio.run(
         extractor.extract(
             email,
-            [DealCandidate(id="deal-1", deal_name="The Oaks at Westlake", property_name="The Oaks at Westlake")],
+            [
+                DealCandidate(
+                    id="deal-1", deal_name="The Oaks at Westlake", property_name="The Oaks at Westlake"
+                )
+            ],
         )
     )
 
