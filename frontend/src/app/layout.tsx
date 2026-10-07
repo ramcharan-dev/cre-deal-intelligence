@@ -19,12 +19,22 @@ export const metadata: Metadata = {
   description: "AI-assisted commercial real estate deal analysis",
 };
 
+const themeScript = `(function(){var root=document.documentElement;try{var stored=localStorage.getItem("theme");if(stored==="dark"||(stored!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))root.classList.add("dark")}catch(e){}document.addEventListener("click",function(event){var node=event.target;if(node&&node.nodeType!==1)node=node.parentElement;if(!node||!node.closest("[data-theme-toggle]"))return;var next=root.classList.contains("dark")?"light":"dark";root.classList.toggle("dark",next==="dark");try{localStorage.setItem("theme",next)}catch(e){}})})();`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: themeScript,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <SiteNav />
         {children}

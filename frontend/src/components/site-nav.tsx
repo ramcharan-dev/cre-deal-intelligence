@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const LINKS = [
   { href: "/integrations/gmail", label: "Gmail" },
@@ -24,6 +25,9 @@ export function SiteNav() {
               {l.label}
             </Link>
           ))}
+        </div>
+        <div className="ml-auto">
+          <ThemeToggle />
         </div>
       </nav>
     </header>

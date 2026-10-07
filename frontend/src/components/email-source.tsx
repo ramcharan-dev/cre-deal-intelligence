@@ -26,7 +26,9 @@ export function EmailSource({ email, highlight }: { email: EmailSourceData; high
         {span ? (
           <>
             {email.text.slice(0, span[0])}
-            <mark className="rounded bg-amber-200 px-0.5 text-black">{email.text.slice(span[0], span[1])}</mark>
+            <mark className="rounded bg-amber-200 px-0.5 text-black dark:bg-amber-400/35 dark:text-amber-50">
+              {email.text.slice(span[0], span[1])}
+            </mark>
             {email.text.slice(span[1])}
           </>
         ) : (
