@@ -107,6 +107,18 @@ class SourcedValue(BaseModel):
     source_email_sent_at: datetime | None = None
 
 
+DealStatusCode = Literal[
+    "intake",
+    "marketing",
+    "quotes_received",
+    "term_sheet",
+    "application",
+    "all_declined",
+    "closed",
+    "inactive",
+]
+
+
 class DealListItem(BaseModel):
     id: uuid.UUID
     deal_name: str
@@ -125,6 +137,13 @@ class DealListItem(BaseModel):
     lowest_fixed_rate_lender: str | None = None
     last_activity_at: datetime | None = Field(None, description="Date of the newest email linked to the deal")
     is_historical: bool = Field(False, description="No email activity in the last 180 days")
+    status: DealStatusCode | None = None
+    status_label: str | None = None
+    sponsor_name: str | None = None
+    property_name: str | None = None
+
+
+QuoteValidity = Literal["valid", "expiring_soon", "expired", "no_expiry"]
 
 
 class QuoteDetail(BaseModel):
@@ -136,6 +155,17 @@ class QuoteDetail(BaseModel):
     option_label: str | None
     fields: list[SourcedValue]
     updated_at: datetime
+    quote_date: datetime | None = Field(
+        None, description="Sent date of the first email that stated this quote"
+    )
+    last_updated_at: datetime | None = Field(
+        None, description="Sent date of the newest email that updated it"
+    )
+    source: "SourceRef | None" = Field(None, description="The email the quote was first extracted from")
+    validity: QuoteValidity = Field(
+        "no_expiry", description="From `expiration_date`: expiring_soon means within 7 days"
+    )
+    days_to_expiry: int | None = None
 
 
 class DealEmail(BaseModel):
@@ -145,6 +175,58 @@ class DealEmail(BaseModel):
     sent_at: datetime | None
     email_type: str | None
     summary: str | None
+    sender_name: str | None = None
+    to: list[str] = []
+    attachment_names: list[str] = []
+
+
+class DealStatus(BaseModel):
+    code: DealStatusCode
+    label: str
+    reason: str = Field(description="Why the deal is in this status")
+    sources: list["SourceRef"] = []
+
+
+class LenderApproach(BaseModel):
+    """A lender on the deal: one that responded (quoted/declined) or one the deal was sent to."""
+
+    name: str
+    lender_id: uuid.UUID | None = Field(None, description="Null for a lender that has not responded")
+    contact_name: str | None
+    contact_email: str | None
+    status: Literal["quoted", "term_sheet", "application", "declined", "awaiting_response"]
+    quote_count: int
+    first_contact_at: datetime | None
+    last_contact_at: datetime | None
+    source: "SourceRef | None" = None
+
+
+class DealDocument(BaseModel):
+    name: str
+    category: str = Field(description="Guessed from the file name, e.g. Term sheet, Rent roll, Other")
+    email_id: uuid.UUID
+    email_subject: str
+    email_sender: str | None
+    email_sent_at: datetime | None
+
+
+class DealActivity(BaseModel):
+    kind: Literal["submission", "quote", "decline", "update", "meeting", "email"]
+    title: str
+    text: str | None
+    at: datetime | None = Field(description="When it happened (email date)")
+    scheduled_for: date | None = Field(None, description="Meeting/call date stated in the email, if any")
+    source: "SourceRef"
+
+
+class PendingAction(BaseModel):
+    kind: Literal["deadline", "request"]
+    title: str
+    text: str | None
+    responsible: str | None = Field(description="Person or party expected to act")
+    due_date: date | None
+    overdue: bool
+    source: "SourceRef | None"
 
 
 class DealDetail(BaseModel):
@@ -156,6 +238,11 @@ class DealDetail(BaseModel):
     quotes: list[QuoteDetail]
     emails: list[DealEmail]
     summary: "DealSummary | None" = None
+    status: DealStatus | None = None
+    lenders: list[LenderApproach] = []
+    documents: list[DealDocument] = []
+    activities: list[DealActivity] = []
+    pending_actions: list[PendingAction] = []
 
 
 # ---------- gmail ----------
@@ -334,4 +421,5 @@ class CopilotAnswer(BaseModel):
     items: list[AnswerItem]
 
 
-DealDetail.model_rebuild()
+for _m in (QuoteDetail, DealStatus, LenderApproach, DealActivity, PendingAction, DealDetail):
+    _m.model_rebuild()

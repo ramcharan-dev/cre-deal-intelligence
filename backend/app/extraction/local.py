@@ -680,6 +680,23 @@ class LocalExtractor:
                 rec_val = "non_recourse" if "non" in m_rec.group(0).lower() else "full_recourse"
                 add_qfield("recourse", rec_val, m_rec.group(0))
 
+            # Prepayment
+            m_prepay = re.search(r"(?i)\bprepay(?:ment)?(?:\s*terms?)?\s*[:–-]\s*([^\n\r]{3,160})", text)
+            if m_prepay:
+                add_qfield("prepayment_terms", m_prepay.group(1).strip(), m_prepay.group(0))
+
+            # Security / collateral
+            m_sec = re.search(r"(?i)\b(?:security|collateral)\s*[:–-]\s*([^\n\r]{5,160})", text)
+            if m_sec:
+                add_qfield("security", m_sec.group(1).strip(), m_sec.group(0))
+
+            # Conditions / covenants
+            m_cond = re.search(r"(?i)\b(?:conditions?|covenants?)\s*[:–-]\s*([^\n\r]{5,200})", text)
+            if not m_cond:
+                m_cond = re.search(r"(?i)\bsubject\s+to\s+([^\n\r.]{5,160})", text)
+            if m_cond:
+                add_qfield("conditions", m_cond.group(1).strip(), m_cond.group(0))
+
             # Expiration date
             m_exp = re.search(r"(?i)\b(?:expires?|expiration(?:\s*date)?)\s*[:–-]?\s*([^\n\r,.]{5,30})", text)
             if m_exp:

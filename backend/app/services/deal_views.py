@@ -82,25 +82,50 @@ async def load_deal_detail(db: AsyncSession, deal_id: uuid.UUID) -> DealDetail |
     for r in rows:
         provenance.setdefault((r.entity_type, r.entity_id, r.field_name), []).append(r)
 
+    today = date.today()
+
+    def quote_detail(q: Quote) -> QuoteDetail:
+        q_rows = [
+            r for (kind, entity, _), rs in provenance.items() if (kind, entity) == ("quote", q.id) for r in rs
+        ]
+        q_rows.sort(key=lambda r: r.source_email.sent_at or r.created_at)
+        first = q_rows[0] if q_rows else None
+        fields = _sourced_values(q, "quote", QUOTE_FIELDS, provenance)
+        validity, days = "no_expiry", None
+        if q.expiration_date is not None:
+            days = (q.expiration_date - today).days
+            validity = "expired" if days < 0 else "expiring_soon" if days <= 7 else "valid"
+        return QuoteDetail(
+            id=q.id,
+            lender_id=q.lender_id,
+            lender_name=q.lender.name,
+            lender_contact_name=q.lender.contact_name,
+            lender_contact_email=q.lender.contact_email,
+            option_label=q.option_label or None,
+            fields=fields,
+            updated_at=q.updated_at,
+            quote_date=first.source_email.sent_at if first else None,
+            last_updated_at=q_rows[-1].source_email.sent_at if q_rows else None,
+            source=SourceRef(
+                email_id=first.source_email_id,
+                email_subject=first.source_email.subject,
+                email_sender=first.source_email.sender_email,
+                email_sent_at=first.source_email.sent_at,
+                label="Quote",
+            )
+            if first
+            else None,
+            validity=validity,
+            days_to_expiry=days,
+        )
+
     return DealDetail(
         id=deal.id,
         deal_name=deal.deal_name,
         created_at=deal.created_at,
         updated_at=deal.updated_at,
         fields=_sourced_values(deal, "deal", DEAL_FIELDS, provenance),
-        quotes=[
-            QuoteDetail(
-                id=q.id,
-                lender_id=q.lender_id,
-                lender_name=q.lender.name,
-                lender_contact_name=q.lender.contact_name,
-                lender_contact_email=q.lender.contact_email,
-                option_label=q.option_label or None,
-                fields=_sourced_values(q, "quote", QUOTE_FIELDS, provenance),
-                updated_at=q.updated_at,
-            )
-            for q in sorted(deal.quotes, key=lambda q: (q.lender.name, q.option_label))
-        ],
+        quotes=[quote_detail(q) for q in sorted(deal.quotes, key=lambda q: (q.lender.name, q.option_label))],
         emails=[
             DealEmail(
                 id=e.id,
@@ -286,7 +311,8 @@ def build_summary(detail: DealDetail) -> DealSummary:
         who = fmt(f["sponsor_name"]) if "sponsor_name" in f else "The sponsor"
         amount = f"{fmt(f['loan_amount_requested'])} " if "loan_amount_requested" in f else ""
         purpose = fmt(f["transaction_type"]) if "transaction_type" in f else "financing"
-        text = f"{who} is seeking a {amount}{purpose} loan"
+        phrase = f"{amount}{purpose}"
+        text = f"{who} is seeking {'an' if phrase[:1].lower() in 'aeiou' else 'a'} {phrase} loan"
         if "target_ltv" in f:
             text += f" at about {fmt(f['target_ltv'])} LTV"
         if "target_closing_date" in f:

@@ -151,6 +151,21 @@ with structured output; validation, matching and persistence are unchanged. Expe
 a laptop. `OLLAMA_NUM_CTX` (default 16384) must fit the prompt, or Ollama silently truncates it.
 
 Tests fake Google with an `httpx.MockTransport` (`tests/test_gmail.py`), so no Google credentials are needed.
+## Deal dashboard
+
+`/deals` lists one row per transaction (status, borrower, quotes, best terms). `/deals/{id}` (`GET /api/deals/{id}`)
+is the transaction dashboard: status, property details, borrower/client, lenders approached (responded, or sent the
+package and yet to reply), a lender quote comparison (loan amount, rate, LTV, tenure, fees, security, conditions,
+prepayment, quote date, validity), the email timeline, documents (attachment names), activities and meetings
+mentioned in emails, pending actions with the responsible person and due date, and the deal summary. Everything is
+derived from stored emails and validated values (`services/deal_dashboard.py`), and each item links to its source
+email and verbatim text. Open dashboards refresh on focus and every 20 s, so emails processed from Gmail show up
+without a reload.
+
+Duplicate deals are prevented by matching on the email thread, address, the model's pick, or the property/deal name,
+and by resolving and saving each email's deal under a Postgres advisory lock, so two emails about the same new deal
+processed at once create one deal.
+
 ## POC demo (no AI model required)
 
 The POC runs end to end with the **demo extraction provider**: `DemoExtractor` (`app/extraction/demo.py`) replays

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { AutoRefresh } from "@/components/auto-refresh";
 import { CopilotAsk } from "@/components/copilot-ask";
+import { DealStatusBadge } from "@/components/deal-sections";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDeals } from "@/lib/api";
@@ -30,12 +32,22 @@ export default async function DealsPage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-10">
+      <AutoRefresh />
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Deal dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Created and updated from processed emails.</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            One row per transaction, created and updated as emails are processed with AI.
+          </p>
         </div>
-        <Button render={<Link href="/emails" />}>Upload email</Button>
+        <div className="flex gap-2">
+          <Link href="/integrations/gmail" className={buttonVariants()}>
+            Process Gmail
+          </Link>
+          <Link href="/emails" className={buttonVariants({ variant: "outline" })}>
+            Upload email
+          </Link>
+        </div>
       </div>
 
       {deals.length === 0 ? (
@@ -56,6 +68,7 @@ export default async function DealsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Deal</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead className="text-right">Loan request</TableHead>
@@ -77,6 +90,12 @@ export default async function DealsPage() {
                         Historical
                       </Badge>
                     )}
+                    {d.sponsor_name && (
+                      <span className="text-muted-foreground block text-xs">Borrower: {d.sponsor_name}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {d.status && d.status_label ? <DealStatusBadge code={d.status} label={d.status_label} /> : "—"}
                   </TableCell>
                   <TableCell>{d.property_type ? humanize(d.property_type) : "—"}</TableCell>
                   <TableCell>{[d.city, d.state].filter(Boolean).join(", ") || "—"}</TableCell>

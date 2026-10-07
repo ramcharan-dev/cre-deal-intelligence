@@ -20,4 +20,4 @@ def test_readiness_reports_db_and_pgvector() -> None:
     assert db["status"] == "ok"
     assert db["server_version"].startswith("18")
     assert db["pgvector_version"]
-    assert db["alembic_revision"] == "0003"
+    assert db["alembic_revision"] == "0004"

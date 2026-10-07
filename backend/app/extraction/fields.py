@@ -152,6 +152,18 @@ QUOTE_FIELDS: tuple[FieldSpec, ...] = (
         "prepayment_terms", "Prepayment", FieldType.TEXT, "Prepayment / yield maintenance / defeasance"
     ),
     FieldSpec(
+        "security",
+        "Security",
+        FieldType.TEXT,
+        "Collateral and credit support, e.g. first mortgage lien, assignment of rents, guarantees",
+    ),
+    FieldSpec(
+        "conditions",
+        "Conditions",
+        FieldType.TEXT,
+        "Key conditions / covenants the quote is subject to, e.g. reserves, cash management, approvals",
+    ),
+    FieldSpec(
         "recourse",
         "Recourse",
         FieldType.ENUM,

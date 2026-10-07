@@ -99,6 +99,81 @@ export type DealListItem = {
   lowest_fixed_rate_lender: string | null;
   last_activity_at: string | null;
   is_historical: boolean;
+  status: DealStatusCode | null;
+  status_label: string | null;
+  sponsor_name: string | null;
+  property_name: string | null;
+};
+
+export type DealStatusCode =
+  | "intake"
+  | "marketing"
+  | "quotes_received"
+  | "term_sheet"
+  | "application"
+  | "all_declined"
+  | "closed"
+  | "inactive";
+
+export type DealStatus = { code: DealStatusCode; label: string; reason: string; sources: SourceRef[] };
+
+export type QuoteValidity = "valid" | "expiring_soon" | "expired" | "no_expiry";
+
+export type DealQuote = {
+  id: string;
+  lender_id: string;
+  lender_name: string;
+  lender_contact_name: string | null;
+  lender_contact_email: string | null;
+  option_label: string | null;
+  fields: SourcedValue[];
+  updated_at: string;
+  /** Sent date of the first email that stated this quote. */
+  quote_date: string | null;
+  last_updated_at: string | null;
+  source: SourceRef | null;
+  validity: QuoteValidity;
+  days_to_expiry: number | null;
+};
+
+export type LenderApproach = {
+  name: string;
+  lender_id: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  status: "quoted" | "term_sheet" | "application" | "declined" | "awaiting_response";
+  quote_count: number;
+  first_contact_at: string | null;
+  last_contact_at: string | null;
+  source: SourceRef | null;
+};
+
+export type DealDocument = {
+  name: string;
+  category: string;
+  email_id: string;
+  email_subject: string;
+  email_sender: string | null;
+  email_sent_at: string | null;
+};
+
+export type DealActivity = {
+  kind: "submission" | "quote" | "decline" | "update" | "meeting" | "email";
+  title: string;
+  text: string | null;
+  at: string | null;
+  scheduled_for: string | null;
+  source: SourceRef;
+};
+
+export type PendingAction = {
+  kind: "deadline" | "request";
+  title: string;
+  text: string | null;
+  responsible: string | null;
+  due_date: string | null;
+  overdue: boolean;
+  source: SourceRef | null;
 };
 
 export type DealDetail = {
@@ -107,16 +182,7 @@ export type DealDetail = {
   created_at: string;
   updated_at: string;
   fields: SourcedValue[];
-  quotes: {
-    id: string;
-    lender_id: string;
-    lender_name: string;
-    lender_contact_name: string | null;
-    lender_contact_email: string | null;
-    option_label: string | null;
-    fields: SourcedValue[];
-    updated_at: string;
-  }[];
+  quotes: DealQuote[];
   emails: {
     id: string;
     subject: string;
@@ -124,8 +190,16 @@ export type DealDetail = {
     sent_at: string | null;
     email_type: string | null;
     summary: string | null;
+    sender_name: string | null;
+    to: string[];
+    attachment_names: string[];
   }[];
   summary: DealSummary | null;
+  status: DealStatus | null;
+  lenders: LenderApproach[];
+  documents: DealDocument[];
+  activities: DealActivity[];
+  pending_actions: PendingAction[];
 };
 
 /** Where a statement comes from: the email and, when available, the verbatim text. */

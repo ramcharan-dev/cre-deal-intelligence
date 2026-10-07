@@ -4,7 +4,8 @@ Precedence (first hit wins):
   1. email_thread  - the email replies to / references an email already linked to a deal
   2. address       - extracted street address + city match an existing deal exactly (normalized)
   3. claude        - Claude picked a candidate deal with high or medium confidence
-  4. property_name - extracted property name matches an existing deal exactly (normalized)
+  4. property_name - extracted property or deal name matches an existing deal's property or deal name exactly
+                     (normalized)
   5. new           - otherwise a new deal is created (only if the email carries deal content)
 """
 
@@ -95,11 +96,19 @@ def resolve_deal(
         if any(c.id == match.matched_deal_id for c in candidates):
             return DealResolution(match.matched_deal_id, "claude", match.reasoning)
 
-    prop = normalize_name(fields.get("property_name"))
-    if prop:
-        hits = [c for c in candidates if normalize_name(c.property_name) == prop]
+    # Property or deal name, compared against both names of each candidate ("Riverbend Lofts" may be the deal
+    # name on one email and the property name on the next).
+    names = {normalize_name(fields.get(k)) for k in ("property_name", "deal_name")} - {""}
+    if names:
+        hits = [
+            c
+            for c in candidates
+            if names & ({normalize_name(c.property_name), normalize_name(c.deal_name)} - {""})
+        ]
         if len(hits) == 1:
-            return DealResolution(hits[0].id, "property_name", f"Property name matches '{hits[0].deal_name}'")
+            return DealResolution(
+                hits[0].id, "property_name", f"Property/deal name matches '{hits[0].deal_name}'"
+            )
 
     if not extraction.has_deal_content:
         return DealResolution(None, "none", "Email does not describe a CRE deal")

@@ -10,7 +10,8 @@ from sqlalchemy.orm import selectinload
 from app.api.errors import ApiError, error_responses
 from app.api.schemas import DealDetail, DealListItem
 from app.db.session import get_db
-from app.models import Deal, Quote
+from app.models import Deal, Email, Quote
+from app.services.deal_dashboard import build_dashboard, list_status
 from app.services.deal_views import HISTORICAL_AFTER, build_summary, load_deal_detail
 from app.services.email_ingestion import canonical
 
@@ -26,6 +27,7 @@ def _list_item(d: Deal, now: datetime) -> DealListItem:
     amounts = [q.loan_amount for q in live if q.loan_amount is not None]
     sent = [e.sent_at for e in d.emails if e.sent_at is not None]
     last_activity = max(sent, default=None)
+    status = list_status(d.quotes, d.emails, now)
     return DealListItem(
         id=d.id,
         deal_name=d.deal_name,
@@ -44,6 +46,10 @@ def _list_item(d: Deal, now: datetime) -> DealListItem:
         lowest_fixed_rate_lender=best_fixed.lender.name if best_fixed else None,
         last_activity_at=last_activity,
         is_historical=last_activity is not None and now - last_activity > HISTORICAL_AFTER,
+        status=status.code,
+        status_label=status.label,
+        sponsor_name=d.sponsor_name,
+        property_name=d.property_name,
     )
 
 
@@ -72,10 +78,13 @@ async def list_deals(db: DbDep) -> list[DealListItem]:
 @router.get(
     "/{deal_id}",
     response_model=DealDetail,
-    summary="Get a deal with quotes, summary and source references",
+    summary="Get a deal dashboard: quotes, lenders, documents, activities, pending actions, summary",
     description=(
         "Current value of every populated deal and quote field, each with the email and verbatim "
-        "`source_text` it came from, all emails linked to the deal, and a summary built from those values."
+        "`source_text` it came from, all emails linked to the deal, and a summary built from those values. "
+        "Also the deal status, lenders approached (responded or awaiting a response), attachments, an activity "
+        "log (including meetings/calls mentioned in emails) and pending actions with the responsible person "
+        "and due date, each linked to its source email."
     ),
     responses=error_responses(404),
 )
@@ -84,4 +93,6 @@ async def get_deal(deal_id: uuid.UUID, db: DbDep) -> DealDetail:
     if detail is None:
         raise ApiError(status.HTTP_404_NOT_FOUND, "not_found", "Deal not found")
     detail.summary = build_summary(detail)
+    emails = (await db.execute(select(Email).where(Email.deal_id == deal_id))).scalars().all()
+    build_dashboard(detail, list(emails))
     return detail

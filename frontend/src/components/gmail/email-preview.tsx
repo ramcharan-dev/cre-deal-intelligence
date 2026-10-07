@@ -6,7 +6,7 @@ import { Building2, CircleAlert, ExternalLink, FileText, LoaderCircle, Paperclip
 
 import { CategoryBadge, RelevanceMeter, StatusBadge } from "@/components/gmail/email-table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/format";
 import type { GmailMessage, GmailMessageDetail } from "@/lib/gmail";
@@ -132,10 +132,21 @@ export function EmailPreview({
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap gap-2">
             {message.status === "processed" && message.email_id ? (
-              <Button render={<Link href={`/emails/${message.email_id}`} />}>
-                <FileText data-icon="inline-start" />
-                View extraction
-              </Button>
+              <>
+                {message.deal_id && (
+                  <Link href={`/deals/${message.deal_id}`} className={buttonVariants()}>
+                    <Building2 data-icon="inline-start" />
+                    Open deal dashboard
+                  </Link>
+                )}
+                <Link
+                  href={`/emails/${message.email_id}`}
+                  className={buttonVariants({ variant: message.deal_id ? "outline" : "default" })}
+                >
+                  <FileText data-icon="inline-start" />
+                  View extraction
+                </Link>
+              </>
             ) : (
               <Button onClick={() => onProcess(message.id)} disabled={busy}>
                 {busy ? <LoaderCircle className="animate-spin" data-icon="inline-start" /> : <Sparkles data-icon="inline-start" />}
@@ -143,10 +154,15 @@ export function EmailPreview({
               </Button>
             )}
             {detail && (
-              <Button variant="outline" render={<a href={detail.gmail_url} target="_blank" rel="noreferrer" />}>
+              <a
+                href={detail.gmail_url}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonVariants({ variant: "outline" })}
+              >
                 <ExternalLink data-icon="inline-start" />
                 Open in Gmail
-              </Button>
+              </a>
             )}
           </div>
           <p className="text-muted-foreground text-xs" role="status">

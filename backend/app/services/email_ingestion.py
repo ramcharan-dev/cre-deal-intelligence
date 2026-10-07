@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas import (
@@ -31,6 +31,9 @@ from app.models import Deal, Email, ExtractedValue, Lender, Quote
 from app.services.email_parser import ParsedEmail, parse_email
 
 log = logging.getLogger(__name__)
+
+# pg advisory lock key held while an email's deal is resolved and persisted.
+DEAL_RESOLUTION_LOCK = 0x4352_4544  # "CRED"
 
 LENDER_FIELD_LABELS = {"name": "Lender", "contact_name": "Lender contact", "contact_email": "Lender email"}
 
@@ -303,7 +306,6 @@ async def ingest_email(
     db.add(email)
     await db.commit()
 
-    thread_deal_id = await _thread_deal_id(db, parsed)
     candidates = await load_candidates(db, max_candidates)
 
     try:
@@ -321,8 +323,15 @@ async def ingest_email(
         raise IngestionError(err, email.id) from exc
 
     email.model = getattr(extractor, "model", email.model)
-    validated = validate_extraction(raw_extraction, parsed.as_prompt_text(), {c.id for c in candidates})
-    resolution = resolve_deal(validated, candidates, thread_deal_id)
+    # Serialize deal resolution + persistence: two emails about the same new deal processed at the same time
+    # would otherwise both resolve to "new" and create duplicates. Candidates are re-read under the lock
+    # (released at commit/rollback) so a deal created by a concurrent email is matched.
+    await db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": DEAL_RESOLUTION_LOCK})
+    thread_deal_id = await _thread_deal_id(db, parsed)
+    fresh = await load_candidates(db, max_candidates)
+    known_ids = {c.id for c in candidates} | {c.id for c in fresh}
+    validated = validate_extraction(raw_extraction, parsed.as_prompt_text(), known_ids)
+    resolution = resolve_deal(validated, fresh, thread_deal_id)
 
     try:
         result = await _persist(db, email, parsed, validated, resolution)

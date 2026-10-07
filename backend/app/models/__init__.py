@@ -132,6 +132,8 @@ class Quote(TimestampMixin, Base):
     origination_fee_pct: Mapped[Decimal | None] = mapped_column(Pct)
     exit_fee_pct: Mapped[Decimal | None] = mapped_column(Pct)
     prepayment_terms: Mapped[str | None] = mapped_column(Text)
+    security: Mapped[str | None] = mapped_column(Text)
+    conditions: Mapped[str | None] = mapped_column(Text)
     recourse: Mapped[str | None] = mapped_column(String(40))
     extension_options: Mapped[str | None] = mapped_column(Text)
     quote_status: Mapped[str | None] = mapped_column(String(40))
